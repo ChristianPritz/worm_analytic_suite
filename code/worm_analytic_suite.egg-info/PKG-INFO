@@ -1,0 +1,31 @@
+Metadata-Version: 2.4
+Name: worm_analytic_suite
+Version: 1.0.0
+Summary: Python framework for analysis of worm silhouettes
+Author: Christian Pritz
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: scipy
+Requires-Dist: pillow
+Requires-Dist: shapely
+Requires-Dist: scikit-learn
+Requires-Dist: scikit-image
+Requires-Dist: matplotlib
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Dynamic: author
+Dynamic: classifier
+Dynamic: description-content-type
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

@@ -1,0 +1,15 @@
+numpy
+pandas
+scipy
+pillow
+shapely
+scikit-learn
+scikit-image
+matplotlib
+
+[dev]
+pytest>=7.0
+pytest-cov
+flake8
+black
+ruff

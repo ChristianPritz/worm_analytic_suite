@@ -1,0 +1,6 @@
+setup.py
+code/worm_analytic_suite.egg-info/PKG-INFO
+code/worm_analytic_suite.egg-info/SOURCES.txt
+code/worm_analytic_suite.egg-info/dependency_links.txt
+code/worm_analytic_suite.egg-info/requires.txt
+code/worm_analytic_suite.egg-info/top_level.txt

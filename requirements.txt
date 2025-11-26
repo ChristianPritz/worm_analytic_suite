@@ -1,0 +1,11 @@
+numpy
+pandas
+scipy
+pillow
+shapely
+scikit-learn
+scikit-image
+matplotlib
+
+
+
