@@ -29,12 +29,12 @@ settings = {"rim_score_cutoff":0.09,"debug":True}
 collect_annotations(settings,
     anno_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/labels',
     image_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images',
-    color_csv='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/class_colors.csv',
+    color_csv='/media/my_device/space worms/makesenseai_analyzed_images/classes/class_colors.csv',
     output_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output'
 )
 
 ##---------------------------------------------------------------------------##
-# label the unworthy
+# OPTIONALLY: TRAIN THE LABELLING OF THE UNWORTHY..........................
 areas_json = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json'
 tlabels = label_coco_areas(areas_json)
 hists2 = coco_areas_calculation(areas_json)

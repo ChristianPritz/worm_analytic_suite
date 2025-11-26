@@ -6,6 +6,6 @@ shapely
 scikit-learn
 scikit-image
 matplotlib
-
+opencv-python-headless
 
 

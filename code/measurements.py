@@ -18,7 +18,7 @@ from skimage.draw import polygon as sk_polygon
 from shapely.geometry import Polygon, Point, LineString
 from pathlib import Path
 
-from IPython import embed
+
 from scipy.signal import savgol_filter
 
 from IPython import embed
@@ -533,11 +533,15 @@ def analyze_thickness(area, head_coords, tail_coords,ol_tail, image_path):
     print(area_coords.shape[0])
     
     centerline,area = get_centerline_wrapper(area_coords, head_coords, ol_tail)
+    
     #head_coords, tail_coords = find_head_tail(area_coords, 1, int(area_coords.shape[0]/10), debug=True) #settings
     
     
     
     percents=np.arange(0.05,1,0.05)
+    error = {}
+    for i in percents:
+        error[i]=np.nan
     
     if  np.all(np.isnan(centerline)):
         thicks = {}
@@ -545,12 +549,15 @@ def analyze_thickness(area, head_coords, tail_coords,ol_tail, image_path):
             thicks[i] = np.nan
         length = np.nan
     else:
-        
-        thicks,length = measure_tube_thickness(area_coords,centerline,head_coords,tail_coords,percents = percents, debug=True)
+        try: 
+            thicks,length = measure_tube_thickness(area_coords,centerline,head_coords,tail_coords,percents = percents, debug=True)
+        except:
+            thicks = error
+            length = np.nan
     output = {}
 
     for i in percents:
-    
+        
         output['percent_'+str(np.round(i,2))] = thicks[i]
     output["length"] = length
     output["area"] = area
@@ -949,7 +956,8 @@ def apply_filtering(coco_json, settings):
             new_json["annotations"].append(copy.deepcopy(ann))
             clean_scores.append(score)
 
-    if settings["debug"]:
+    if settings["debug"] and len(control_coords)>0:
+
         visualize_worms_threshold(
             control_coords, control_scores, settings["rim_score_cutoff"],
             space_size=image_size[0], show_indices=True
@@ -1038,7 +1046,7 @@ def smooth_pts(pts, win=31, poly=3):
 def straighten(image, pts, width, debug=False):
     """
     Attribution: 
-    This is a python verision of Rolf Harkes' straighten.m 
+    This is a python version of Rolf Harkes' straighten.m 
     https://github.com/rharkes/straighten
     
     Straighten image along a spline through pts.
@@ -1927,4 +1935,5 @@ def organize_dataset(base_dir):
                 print(f"Moving label: {src} -> {dst}")
                 shutil.move(str(src), str(dst))
 
-    print("\n✅ Done! All images moved to /images and labels moved to /labels.\n")
+    print("\n Done! All images moved to /images and labels moved to /labels.\n")
+

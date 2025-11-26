@@ -205,7 +205,8 @@ def classify(X,model=None, threshold=0.5,normalize=False):
         probs: model probability for class '1'
     """
     if model is None:
-        model = joblib.load("RF_classifier.pkl")
+        model = load_model()
+        #model = joblib.load("RF_classifier.pkl")
     if normalize:
         X = copy.copy(X)
         X = normalize_zscore(X) 
@@ -266,3 +267,14 @@ def run_kmeans_and_show(X, external_label, k):
     plt.show()
 
     return labels, X_sorted, external_sorted, sorted_labels, kmeans
+
+#-----------------------------------------------------------------------------#
+#
+# HELPER FUNCTIONS
+#
+#-----------------------------------------------------------------------------#
+
+def load_model():
+    import os, joblib
+    path = os.path.join(os.path.dirname(__file__), "RF_classifier.pkl")
+    return joblib.load(path)
