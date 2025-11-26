@@ -62,12 +62,12 @@ df = analyze_annotations(
 #             A N A L Y Z E    C O L O R C H A N N E L S 
 ##---------------------------------------------------------------------------##
 color_matrix = np.array([
-    [0.174, 0.61, 0.77],  # R
-    [0.8, 0.80, 0.80],  # G
-    [0.77, 0.174, 0.6]   # B
+    [0.2117, 0.6481, 0.7299],  # R
+    [0.5396, 0.5686, 0.6182],  # G
+    [0.6250, 0.5654, 0.5375]   # B
 ])
 
-color_matrix = color_matrix/255
+color_matrix = color_matrix.transpose()
 settings = {"rim_score_cutoff":0.09,
             "imsize":3120}
 

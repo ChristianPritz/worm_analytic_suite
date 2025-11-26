@@ -474,7 +474,8 @@ def color_deconvolution(image_path, color_matrix, output_dir, prefix="c"):
     # --- 6. Save results ---
     os.makedirs(output_dir, exist_ok=True)
     for i in range(3):
-        channel_img = (1 - separated[:, :, i]) * 255  # invert for better contrast
+        #channel_img = (1 - separated[:, :, i]) * 255  # invert for better contrast
+        channel_img = make_8bit_img(separated[:, :, i])
         out_path = os.path.join(output_dir, f"{basename}_{prefix}_{i+1}.png")
         cv2.imwrite(out_path, channel_img.astype(np.uint8))
         print(f"Saved: {out_path}")
@@ -624,6 +625,20 @@ def match_head_tail(area_coords, points_df):
 
     return head, tail, p1,p2
 
+def make_8bit_img(mat):
+    mat = copy.copy(mat)                # copy
+    mat = mat - np.min(mat)             # optional: shift to start at 0
+    mat = mat / np.max(mat)             # normalize to 0-1
+    mat = np.round(mat * 255)           # scale to 0-255
+    img = mat.astype(np.uint8)  
+    fig, ax = plt.subplots()
+    im = ax.imshow(img, cmap='gray_r')  # grayscale colormap
+    cbar = fig.colorbar(im, ax=ax)            # add colorbar
+    cbar.set_label('Intensity')               # optional label
+    plt.show()    
+    return img
+
+
 def analyze_image_with_annotations(image_path, annotations, color_matrix,output_dir,settings,debug=True):
     """
     Deconvolves image and measures summed intensity per annotation.
@@ -645,8 +660,10 @@ def analyze_image_with_annotations(image_path, annotations, color_matrix,output_
     _,basename=os.path.split(image_path)
     basename=basename[1:-4]
     separated,orig_img = color_deconvolution(image_path, color_matrix,output_dir)
-    red_channel = separated[:, :, 0]  # Use first (red) channel
-
+  
+    red_channel = make_8bit_img(separated[:,:,0])
+    green_channel = make_8bit_img(separated[:,:,1])
+    blue_channel = make_8bit_img(separated[:,:,2])
     
     h, w = red_channel.shape
     results = []
@@ -661,24 +678,20 @@ def analyze_image_with_annotations(image_path, annotations, color_matrix,output_
             #centerline,area = get_centerline_wrapper(coords, head_coords, ol_tail)
             
             centerline,length,area = get_worm_centerline(coords, plot=debug, padding=10)
-            rc = red_channel*255
-            
-            
-            
-            im = np.zeros((red_channel.shape[0],red_channel.shape[0],3),dtype="uint8")
-            im[:,:,0] = rc.astype("uint8")
-            
+    
             centerline = smooth_pts(centerline, win=31, poly=3)
             
-            s_im=straighten(im, centerline, int(length*0.15))
+            s_im=straighten(red_channel, centerline, int(length*0.15))
             s_im_orig=straighten(orig_img, centerline, int(length*0.15))
 
-            out_path = os.path.join(output_dir, f"{basename}_im_{area_id}.png")
-            cv2.imwrite(out_path, s_im.astype(np.uint8))
+            out_path = os.path.join(output_dir, f"red_ch_{basename}_im_{area_id}.png")
+            cv2.imwrite(out_path, s_im)
             
             out_path = os.path.join(output_dir, f"orig_im_{basename}_{area_id}.png")
             s_im_orig = s_im_orig[:,:,[2,1,0]]
             cv2.imwrite(out_path, s_im_orig.astype(np.uint8))
+            
+            
             
             # Create binary mask for this annotation
             mask = np.zeros((h, w), dtype=np.uint8)
