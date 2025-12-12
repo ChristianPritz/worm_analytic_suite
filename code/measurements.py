@@ -31,6 +31,7 @@ from skimage.graph import route_through_array
 from scipy.spatial.distance import cdist
 from scipy.interpolate import interp1d
 from classifiers import classify,angle_histogram
+import importlib.resources as r
 
 
 def analyze_annotations(areas_json, points_csv, image_dir,settings, analysis_func):
@@ -886,7 +887,7 @@ def collect_annotations(settings,anno_dir='annotations', image_dir='images', col
                 ann_id_counter += 1
 
     
-    
+     
     merged_json_clean,scores = apply_filtering(merged_json,settings)
 
     print(
@@ -940,7 +941,10 @@ def apply_filtering(coco_json, settings):
     control_scores = []
     clean_scores = []
     #load the badguy classifier... 
-    model = joblib.load("RF_classifier.pkl")
+    model_path = Path(__file__).resolve().parent / "RF_classifier.pkl"
+    model = joblib.load(model_path)
+    
+    #model = joblib.load("RF_classifier.pkl")
 
     # iterate over ORIGINAL annotations
     for ann in coco_json["annotations"]:
@@ -964,10 +968,14 @@ def apply_filtering(coco_json, settings):
     
         control_coords.append(coords)
         control_scores.append(score)
-
-        if score <= settings["rim_score_cutoff"] and badguy[0]==0:
-            new_json["annotations"].append(copy.deepcopy(ann))
-            clean_scores.append(score)
+        if settings['use_classifier']:
+            if score <= settings["rim_score_cutoff"] and badguy[0]==0:
+                new_json["annotations"].append(copy.deepcopy(ann))
+                clean_scores.append(score)
+        else:
+            if score <= settings["rim_score_cutoff"]:
+                new_json["annotations"].append(copy.deepcopy(ann))
+                clean_scores.append(score)
 
     if settings["debug"] and len(control_coords)>0:
 
