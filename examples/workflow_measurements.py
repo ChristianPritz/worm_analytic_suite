@@ -13,41 +13,69 @@ import cv2
 from measurements import collect_annotations, analyze_annotations,analyze_thickness,analyze_staining_from_json, assign_conditions,organize_dataset
 from worm_plotter import worm_width_plot, df_to_grouped_array,plot_grouped_values
 from classifiers import  classify,run_kmeans_and_show,label_coco_areas,coco_areas_calculation,train_classifier
-
+from annotation_tool_v8 import AnnotationTool
 
 
 ##---------------------------------------------------------------------------##
 #              M E R G E    T H E    A N N O T A T I O N S
+#
+# These lines of code pool all the annotations and images into a single 
+# locations (output_dir, image_dir). And also pools all the annotations into 
+# single annotation files.
+# this scans the entire directory tree and puts all the files together 
+# be cautious of doubling entries 
 ##---------------------------------------------------------------------------##
+
+
+## this copies all the files together into a single image directory 
+## and a single labels directory (output)
 
 organize_dataset("/media/my_device/space worms/makesenseai_analyzed_images/to analyze")
 
 
-settings = {"rim_score_cutoff":0.09,"debug":True}
-
-
-collect_annotations(settings,
-    anno_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/labels',
-    image_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images',
-    color_csv='/media/my_device/space worms/makesenseai_analyzed_images/classes/class_colors.csv',
-    output_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output'
-)
 
 ##---------------------------------------------------------------------------##
-# OPTIONALLY: TRAIN THE LABELLING OF THE UNWORTHY..........................
-areas_json = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json'
-tlabels = label_coco_areas(areas_json)
-hists2 = coco_areas_calculation(areas_json)
-mdl = train_classifier(hists2,tlabels)
-predlabels,p = classify(hists2)
-np.sum(tlabels == predlabels)
+## this joins the labels and throws out bad labels. 
+
+settings = {"rim_score_cutoff":0.05,"debug":True,"use_classifier":False}
+collect_annotations(settings,
+    anno_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/labels', # this is where there raw annoations go
+    image_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images', # this is where the images are sitting
+    color_csv='/media/my_device/space worms/makesenseai_analyzed_images/classes/class_colors.csv', 
+    output_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output' #This is where the joined labels go 
+)
+
+
+##---------------------------------------------------------------------------##
+#              C H E CK    T H E    A N N O T A T I O N S
+#
+# This allows to change the annotations of animals and the shapes
+#
+##---------------------------------------------------------------------------##
+
+image_dir = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/' # this is where the images are sitting
+point_csv =  '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_points.csv'
+area_json =  "/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json"
+color_csv =  '/media/my_device/space worms/makesenseai_analyzed_images/classes/class_colors.csv'
+
+tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
+
+
+# ##---------------------------------------------------------------------------##
+# # OPTIONALLY: TRAIN THE LABELLING OF THE UNWORTHY..........................
+# ##---------------------------------------------------------------------------##
+
+# areas_json = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json'
+# tlabels = label_coco_areas(areas_json)
+# hists2 = coco_areas_calculation(areas_json)
+# mdl = train_classifier(hists2,tlabels)
+# predlabels,p = classify(hists2)
+# np.sum(tlabels == predlabels)
 
 
 ##---------------------------------------------------------------------------##
 #             A N A L Y Z E    T H E    S H A P E S
 ##---------------------------------------------------------------------------##
-
-
 
 df = analyze_annotations(
     areas_json='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json',
@@ -59,8 +87,16 @@ df = analyze_annotations(
 
 
 ##---------------------------------------------------------------------------##
-#             A N A L Y Z E    C O L O R C H A N N E L S 
+#
+#             A N A L Y Z E    C O L O R    C H A N N E L S
+# 
+# This performs a color deconvolution of the images and 
+# quantifies the color in the annotation 
+# it also exports the images of straightened animals. The quantification 
+# however is performed on the original curved animal (original label, 
+# original image) 
 ##---------------------------------------------------------------------------##
+
 color_matrix = np.array([
     [0.2117, 0.6481, 0.7299],  # R
     [0.5396, 0.5686, 0.6182],  # G
