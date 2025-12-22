@@ -6,7 +6,7 @@ Pipeline for high-throughput analysis of nematode Axioscan images.
 
 WORK IN PROGRESS -
 
-DO NOT USE! 
+TESTING STAGE - DO NOT USE! 
 
 ----
 
