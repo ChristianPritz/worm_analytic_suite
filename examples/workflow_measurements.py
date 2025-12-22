@@ -37,7 +37,7 @@ organize_dataset("/media/my_device/space worms/makesenseai_analyzed_images/to an
 ##---------------------------------------------------------------------------##
 ## this joins the labels and throws out bad labels. 
 
-settings = {"rim_score_cutoff":0.05,"debug":True,"use_classifier":False}
+settings = {"rim_score_cutoff":0.05,"debug":True,"use_classifier":True}
 collect_annotations(settings,
     anno_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/labels', # this is where there raw annoations go
     image_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images', # this is where the images are sitting
@@ -77,6 +77,7 @@ tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
 #             A N A L Y Z E    T H E    S H A P E S
 ##---------------------------------------------------------------------------##
 
+settings = {"rim_score_cutoff":0.05,"debug":True,"use_classifier":True}
 df = analyze_annotations(
     areas_json='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json',
     points_csv='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_points.csv',
@@ -114,7 +115,7 @@ df = analyze_staining_from_json('/media/my_device/space worms/makesenseai_analyz
     df=df)
 
 ##---------------------------------------------------------------------------##
-#                 A S S I G N I N G   L A B E L S 
+#            A S S I G N I N G   C O N D I T I O N   L A B E L S 
 ##---------------------------------------------------------------------------##
 
 df2 =assign_conditions(df,col_name ="image_name_y")
