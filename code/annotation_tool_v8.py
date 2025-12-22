@@ -289,8 +289,12 @@ class AnnotationTool:
 
         self.image_files = sorted(list(set(self.point_df['image_name'].tolist())))
         self.current_index = 0
-
+        self.selection_box = None
         self.root = tk.Tk()
+        self.inspector = None
+        self.inspector_canvas = None
+        self.inspector_zoom = tk.DoubleVar(master=self.root, value=4.0)
+        self.inspector_image = None
         self.root.title("Annotation Tool")
 
         self.screen_width = self.root.winfo_screenwidth()
@@ -341,6 +345,179 @@ class AnnotationTool:
         self.load_image()
         self.root.mainloop()
     
+    def open_inspector(self):
+        if self.inspector is not None:
+            return
+    
+        self.inspector = tk.Toplevel(self.root)
+        self.inspector.title("Instance Inspector")
+        self.inspector.geometry("450x450")
+    
+        # --- layout frames ---
+        container = tk.Frame(self.inspector)
+        container.pack(fill=tk.BOTH, expand=True)
+    
+        canvas_frame = tk.Frame(container)
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+    
+        control_frame = tk.Frame(container)
+        control_frame.pack(fill=tk.X)
+    
+        # --- scrollbars ---
+        vbar = tk.Scrollbar(canvas_frame, orient=tk.VERTICAL)
+        hbar = tk.Scrollbar(canvas_frame, orient=tk.HORIZONTAL)
+    
+        self.inspector_canvas = tk.Canvas(
+            canvas_frame,
+            bg="black",
+            xscrollcommand=hbar.set,
+            yscrollcommand=vbar.set
+        )
+    
+        vbar.config(command=self.inspector_canvas.yview)
+        hbar.config(command=self.inspector_canvas.xview)
+    
+        vbar.pack(side=tk.RIGHT, fill=tk.Y)
+        hbar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.inspector_canvas.pack(fill=tk.BOTH, expand=True)
+    
+        # --- zoom controls (ALWAYS visible) ---
+        tk.Label(control_frame, text="Zoom").pack(side=tk.LEFT, padx=5)
+    
+        zoom_slider = tk.Scale(
+            control_frame,
+            from_=1,
+            to=12,
+            resolution=0.5,
+            orient=tk.HORIZONTAL,
+            variable=self.inspector_zoom,
+            command=lambda _: self.update_inspector_from_selection()
+        )
+        zoom_slider.pack(fill=tk.X, expand=True, padx=5)
+    
+        # --- panning bindings ---
+        self.inspector_canvas.bind("<ButtonPress-2>", self._start_pan)
+        self.inspector_canvas.bind("<B2-Motion>", self._do_pan)
+    
+        # Linux / Windows mouse wheel
+        self.inspector_canvas.bind("<MouseWheel>", self._on_mousewheel)
+        # macOS
+        self.inspector_canvas.bind("<Button-4>", self._on_mousewheel)
+        self.inspector_canvas.bind("<Button-5>", self._on_mousewheel)
+    
+        self.inspector.protocol("WM_DELETE_WINDOW", self.close_inspector)
+    
+    def _start_pan(self, event):
+        self.inspector_canvas.scan_mark(event.x, event.y)
+
+    def _do_pan(self, event):
+        self.inspector_canvas.scan_dragto(event.x, event.y, gain=1)
+    
+    def _on_mousewheel(self, event):
+        if event.num == 5 or event.delta < 0:
+            self.inspector_canvas.yview_scroll(1, "units")
+        else:
+            self.inspector_canvas.yview_scroll(-1, "units")
+    
+    def close_inspector(self):
+        if self.inspector:
+            self.inspector.destroy()
+        self.inspector = None
+    
+    def update_inspector_from_selection(self):
+        if self.active_selection is None or self.inspector is None:
+            return
+    
+        zoom = self.inspector_zoom.get()
+        img = self.cv_image.copy()
+    
+        sel_type, data = self.active_selection
+    
+        if sel_type == "point":
+            i = self.point_items[data]
+            x = int(self.point_df.at[i, "x"])
+            y = int(self.point_df.at[i, "y"])
+            half = 30
+            crop = img[
+                max(0, y-half):min(img.shape[0], y+half),
+                max(0, x-half):min(img.shape[1], x+half)
+            ]
+    
+        else:  # polygon or polygon_ann
+            if sel_type == "polygon":
+                _, ann_idx, _ = data
+            else:
+                ann_idx = data
+    
+            coords = self.area_data["annotations"][ann_idx]["segmentation"][0]
+            xs = np.array(coords[0::2]).astype(int)
+            ys = np.array(coords[1::2]).astype(int)
+    
+            pad = 10
+            x0, x1 = max(0, xs.min()-pad), min(img.shape[1], xs.max()+pad)
+            y0, y1 = max(0, ys.min()-pad), min(img.shape[0], ys.max()+pad)
+    
+            crop = img[y0:y1, x0:x1]
+    
+        if crop.size == 0:
+            return
+    
+        h, w = crop.shape[:2]
+        crop = cv2.resize(
+            crop,
+            (int(w*zoom), int(h*zoom)),
+            interpolation=cv2.INTER_NEAREST
+        )
+    
+        pil = Image.fromarray(crop)
+        self.inspector_image = ImageTk.PhotoImage(pil)
+    
+        self.inspector_canvas.delete("all")
+        self.inspector_canvas.delete("all")
+
+        img_id = self.inspector_canvas.create_image(
+            0, 0, anchor=tk.NW, image=self.inspector_image
+        )
+        
+        # VERY IMPORTANT: define scrollable area
+        self.inspector_canvas.config(
+            scrollregion=(0, 0,
+                          self.inspector_image.width(),
+                          self.inspector_image.height())
+        )
+        self.inspector_canvas.create_image(0, 0, anchor=tk.NW, image=self.inspector_image)
+    
+    
+    
+    def clear_selection_box(self):
+        if self.selection_box is not None:
+            self.canvas.delete(self.selection_box)
+            self.selection_box = None
+
+
+    def draw_point_selection_box(self, x, y, size=50):
+        self.clear_selection_box()
+        half = size // 2
+        self.selection_box = self.canvas.create_rectangle(
+            x - half, y - half, x + half, y + half,
+            outline="red", width=2
+        )
+    
+    
+    def draw_polygon_selection_box(self, coords_scaled):
+        """
+        coords_scaled: list of (x,y) in *canvas coordinates*
+        """
+        self.clear_selection_box()
+        xs = [p[0] for p in coords_scaled]
+        ys = [p[1] for p in coords_scaled]
+    
+        self.selection_box = self.canvas.create_rectangle(
+            min(xs), min(ys), max(xs), max(ys),
+            outline="red", width=2
+        )
+    
+    
     def next_image(self):
         self.current_index = (self.current_index + 1) % len(self.image_files)
         self.load_image()
@@ -388,6 +565,11 @@ class AnnotationTool:
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_image)
         self.display_annotations()
         self.active_selection = None
+        self.active_selection = None
+        self.clear_selection_box()
+        self.clear_selection_box()
+        if self.inspector:
+            self.inspector_canvas.delete("all")
 
     def display_annotations(self):
         self.point_items = {}
@@ -439,8 +621,16 @@ class AnnotationTool:
             py = self.point_df.at[i, "y"] * self.scale_factor
             if abs(x - px) <= 5 and abs(y - py) <= 5:
                 self.active_selection = ("point", item)
+                if self.inspector is None:
+                    self.open_inspector()
+                
+                self.update_inspector_from_selection()
                 self.class_var.set(self.point_df.at[i, "class"])
                 self.dragging = True
+                
+                # Draw 50x50 selection box
+                self.draw_point_selection_box(px, py)
+                
                 return
     
         # Check polygon vertex handles
@@ -452,8 +642,19 @@ class AnnotationTool:
                 class_id = self.area_data["annotations"][ann_idx]["category_id"]
                 class_name = next((c["name"] for c in self.area_data["categories"] if c["id"] == class_id), "")
                 self.active_selection = ("polygon", selection)
+                if self.inspector is None:
+                    self.open_inspector()
+                
+                self.update_inspector_from_selection()
                 self.class_var.set(class_name)
                 self.dragging = True
+                
+                # Draw tight bbox around polygon
+                coords = self.area_data["annotations"][ann_idx]["segmentation"][0]
+                scaled = [(coords[i]*self.scale_factor, coords[i+1]*self.scale_factor)
+                          for i in range(0, len(coords), 2)]
+                self.draw_polygon_selection_box(scaled)
+                
                 return
     
         # Check full polygon body
@@ -463,8 +664,16 @@ class AnnotationTool:
                 class_id = self.area_data["annotations"][ann_idx]["category_id"]
                 class_name = next((c["name"] for c in self.area_data["categories"] if c["id"] == class_id), "")
                 self.active_selection = ("polygon_ann", ann_idx)
+                if self.inspector is None:
+                    self.open_inspector()
+                
+                self.update_inspector_from_selection()
                 self.class_var.set(class_name)
+                
                 return
+            
+        self.active_selection = None
+        self.clear_selection_box()
 
     def on_drag(self, event):
         if self.dragging:
@@ -477,6 +686,7 @@ class AnnotationTool:
                 self.canvas.coords(item, x - 5, y - 5, x + 5, y + 5)
                 self.point_df.at[i, "x"] = float(x / self.scale_factor)
                 self.point_df.at[i, "y"] = float(y / self.scale_factor)
+                self.draw_point_selection_box(x, y)
                 self.save_annotations()
     
             elif self.active_selection and self.active_selection[0] == "polygon":
@@ -498,6 +708,8 @@ class AnnotationTool:
                 
                 if hasattr(self, 'reporter_update_callback'):
                     self.reporter_update_callback()
+                self.draw_polygon_selection_box(scaled_coords)
+                self.update_inspector_from_selection()
 
     def on_release(self, event):
         self.dragging = False
