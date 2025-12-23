@@ -119,7 +119,7 @@ df = analyze_staining_from_json('/media/my_device/space worms/makesenseai_analyz
 ##---------------------------------------------------------------------------##
 
 df2 =assign_conditions(df,col_name ="image_name_y")
-
+df2 = create_group_labels(df2)
 
 ##---------------------------------------------------------------------------##
 #                 Plotting
@@ -198,7 +198,20 @@ worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,fl
 
 
 
+
+
+
+# STAINING---------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
 #across_generations:-NG--------------------------------------------------------
+group_colors = np.array([[0.6,0.6,0.6],[0.15,0.45,0.95],[0.95,0.24,0.08]])
+            
+     
+            
+            
+            
+
 
 dfX = pd.concat((df1,df2,df3))
 s=dfX.loc[:,['percent_0.6', 'percent_0.65','percent_0.7','percent_0.75']]
@@ -207,3 +220,63 @@ data  = df_to_grouped_array(dfX,"generation","percent_0.5")
 
 colors = np.array([[0.95,0.35,0.05],[0.65,0.1,0.05],[0.5,0.05,0.05]])
 plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+
+#across_generations:-NG--------------------------------------------------------
+
+df_adult = df[df["label_id"]<6]
+
+
+data  = df_to_grouped_array(df_adult,"group_identifier","intensity")
+plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors,logY=True)
+
+df_LH = df_adult[df_adult["is_LH"]==1]
+data  = df_to_grouped_array(df_LH,"generation","intensity")
+colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+
+
+df_0G = df_adult[df_adult["is_0G"]==1]
+data  = df_to_grouped_array(df_0G,"generation","intensity")
+colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+
+
+df_NG = df_adult[df_adult["is_NG"]==1]
+data  = df_to_grouped_array(df_NG,"generation","intensity")
+colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+
+
+
+
+# AREA---------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+df_adult = df[df["label_id"]<6]
+
+
+data  = df_to_grouped_array(df_adult,"group_identifier","area")
+plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors,logY=True)
+
+df_LH = df_adult[df_adult["is_LH"]==1]
+data  = df_to_grouped_array(df_LH,"generation","area")
+colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+
+
+df_0G = df_adult[df_adult["is_0G"]==1]
+data  = df_to_grouped_array(df_0G,"generation","area")
+colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+
+
+df_NG = df_adult[df_adult["is_NG"]==1]
+data  = df_to_grouped_array(df_NG,"generation","area")
+colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+
+
+
+
+
+

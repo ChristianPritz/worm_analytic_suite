@@ -1859,7 +1859,17 @@ def get_worm_centerline_legacy(poly, plot=False, padding=10):
 # Data and string handling
 #
 ###############################################################################
-
+def create_group_labels(df,grps=None,arr=None):
+    if grps is None:
+        grps = {0:"NG",1:"LH",2:"0G"}
+    if arr is None:
+        arr = np.array([[1,0,0],[0,1,0],[0,0,1]])
+    df["group_identifier"] = "test"
+    for i in range(len(df)):
+        query = df.iloc[i][['is_NG', 'is_LH', 'is_0G']].to_numpy().astype(np.int64)
+        idx = np.where(np.all(arr == query, axis=1))[0]
+        df.loc[df.index[i], "group_identifier"] = grps[idx[0]]
+    return df
 
 def check_cond(istr):
     marker = [0,0,0,0,0]

@@ -24,5 +24,6 @@ __version__ = "1.0.0"
 from .classifiers import *
 from .measurements import *
 from .worm_plotter import *
+from .annotation_tool_v8 import *
 
 __all__ = []
