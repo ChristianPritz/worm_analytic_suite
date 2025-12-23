@@ -217,7 +217,8 @@ def instantiate_plot_props(plot_props=None):
 def plot_grouped_values(data, groups,colors = None,spread=0.5,
                             showMedian=True,showMean=True,
                             plot_props=None,figsize=None,bins=10,
-                            scatter_type = 'ordered',marker_size=50):
+                            scatter_type = 'ordered',marker_size=50,
+                            logY=False,logX=False):
 
         if plot_props is None:
             plot_props = instantiate_plot_props(plot_props)
@@ -324,6 +325,10 @@ def plot_grouped_values(data, groups,colors = None,spread=0.5,
             
         ax.set_xlabel(plot_props['xlabel'])
         ax.set_ylabel(plot_props['ylabel'])
+        if logY:
+            ax.set_yscale("log", nonpositive='mask')
+        if logX:
+            ax.set_xscale("log", nonpositive='mask')
         ax.set_xticks(np.arange(1, num_groups + 1), groups, rotation=55)
         plt.gca().tick_params(width=2, labelsize=16, direction='out')
 
