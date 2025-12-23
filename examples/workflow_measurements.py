@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from shapely.geometry import LineString, Point, Polygon
 import pandas as pd
 import cv2
-from measurements import collect_annotations, analyze_annotations,analyze_thickness,analyze_staining_from_json, assign_conditions,organize_dataset
+from measurements import collect_annotations, analyze_annotations,analyze_thickness,analyze_staining_from_json, assign_conditions,organize_dataset, create_group_labels
 from worm_plotter import worm_width_plot, df_to_grouped_array,plot_grouped_values
 from classifiers import  classify,run_kmeans_and_show,label_coco_areas,coco_areas_calculation,train_classifier
 from annotation_tool_v8 import AnnotationTool
@@ -76,7 +76,6 @@ tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
 ##---------------------------------------------------------------------------##
 #             A N A L Y Z E    T H E    S H A P E S
 ##---------------------------------------------------------------------------##
-
 settings = {"rim_score_cutoff":0.05,"debug":True,"use_classifier":True}
 df = analyze_annotations(
     areas_json='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json',
@@ -85,7 +84,6 @@ df = analyze_annotations(
     settings=settings,
     analysis_func=analyze_thickness
 )
-
 
 ##---------------------------------------------------------------------------##
 #
@@ -256,26 +254,81 @@ df_adult = df[df["label_id"]<6]
 
 
 data  = df_to_grouped_array(df_adult,"group_identifier","area")
-plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors,logY=True)
+plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors)
 
 df_LH = df_adult[df_adult["is_LH"]==1]
 data  = df_to_grouped_array(df_LH,"generation","area")
 colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
 
 
 df_0G = df_adult[df_adult["is_0G"]==1]
 data  = df_to_grouped_array(df_0G,"generation","area")
 colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
 
 
 df_NG = df_adult[df_adult["is_NG"]==1]
 data  = df_to_grouped_array(df_NG,"generation","area")
 colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
 
 
+
+
+# Length---------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+df_adult = df[df["label_id"]<6]
+
+
+data  = df_to_grouped_array(df_adult,"group_identifier","length")
+plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors)
+
+df_LH = df_adult[df_adult["is_LH"]==1]
+data  = df_to_grouped_array(df_LH,"generation","length")
+colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+
+
+df_0G = df_adult[df_adult["is_0G"]==1]
+data  = df_to_grouped_array(df_0G,"generation","length")
+colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+
+
+df_NG = df_adult[df_adult["is_NG"]==1]
+data  = df_to_grouped_array(df_NG,"generation","length")
+colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+
+
+
+# num larvae ------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+df_adult = df[df["label_id"]<6]
+
+
+data  = df_to_grouped_array(df_adult,"group_identifier","area")
+plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors)
+
+df_LH = df_adult[df_adult["is_LH"]==1]
+data  = df_to_grouped_array(df_LH,"generation","area")
+colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+
+
+df_0G = df_adult[df_adult["is_0G"]==1]
+data  = df_to_grouped_array(df_0G,"generation","area")
+colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+
+
+df_NG = df_adult[df_adult["is_NG"]==1]
+data  = df_to_grouped_array(df_NG,"generation","area")
+colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
+plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
 
 
 
