@@ -453,3 +453,101 @@ def style_plot(plt, ax, plot_props=None,show=True):
             ax.set_yscale(plot_props['y_scale'])
         if show:
             plt.show()
+
+
+
+def class_histogram(
+    data,
+    label_classes,
+    color=(0.2, 0.4, 0.8),   # RGB in [0,1]
+    alpha=0.4,
+    figsize=(6, 6),
+    show_counts=False, 
+    normalize = True
+    ):
+
+
+    # Unique classes and counts
+    u_class, cts = np.unique(data, return_counts=True)
+    x = np.arange(len(u_class))
+
+    if normalize:
+        cts = cts/np.sum(cts)*100
+    # Plot
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    bars = ax.bar(
+        x,
+        cts,
+        width=1.0,          # <-- touching bars
+        color=color,
+        alpha=alpha,
+        edgecolor="black",
+        linewidth=0
+    )
+
+    tf = np.isin(label_classes.iloc[:,4].to_numpy(),u_class)
+    labels = label_classes.iloc[tf,0]
+    # X-axis labels
+    ax.set_xticks(x)
+    print('b',labels)
+    if labels is not None:
+        if len(labels) != len(u_class):
+            raise ValueError(
+                f"labels length ({len(labels)}) must match number of classes ({len(u_class)})"
+            )
+        ax.set_xticklabels(labels)
+    else:
+        print('a')
+        #ax.set_xticklabels(u_class)
+
+
+    # Axis labels
+    if normalize:
+        ax.set_ylabel("Normalized count", fontsize=14)
+    else: 
+        ax.set_ylabel("Count", fontsize=14)
+    
+    ax.set_xlabel("Class", fontsize=14)
+    
+    # Clean style
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    
+    for spine in ["left", "bottom"]:
+        ax.spines[spine].set_linewidth(2.0)
+    
+    ax.tick_params(
+        axis="both",
+        which="major",
+        labelsize=14,
+        width=2,
+        length=6
+    )
+
+    ax.margins(x=0)
+    ax.tick_params(axis="x", labelrotation=90)
+
+
+    # Annotate counts
+    if show_counts:
+        for rect, count in zip(bars, cts):
+            ax.text(
+                rect.get_x() + rect.get_width() / 2,
+                rect.get_height(),
+                str(int(count)),
+                ha="center",
+                va="bottom",
+                fontsize=10
+            )
+
+    plt.tight_layout()
+    plt.show()
+    
+    
+    
+    
+    
+    
+    
+    
