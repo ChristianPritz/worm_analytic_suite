@@ -11,7 +11,7 @@ from shapely.geometry import LineString, Point, Polygon
 import pandas as pd
 import cv2
 from measurements import collect_annotations, analyze_annotations,analyze_thickness,analyze_staining_from_json, assign_conditions,organize_dataset, create_group_labels
-from worm_plotter import worm_width_plot, df_to_grouped_array,plot_grouped_values
+from worm_plotter import worm_width_plot, df_to_grouped_array,plot_grouped_values,class_histogram
 from classifiers import  classify,run_kmeans_and_show,label_coco_areas,coco_areas_calculation,train_classifier
 from annotation_tool_v8 import AnnotationTool
 
@@ -195,19 +195,12 @@ worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,fl
 
 
 
-
-
-
-
 # STAINING---------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
 #across_generations:-NG--------------------------------------------------------
 group_colors = np.array([[0.6,0.6,0.6],[0.15,0.45,0.95],[0.95,0.24,0.08]])
-            
-     
-            
-            
+  
             
 
 
@@ -304,32 +297,39 @@ plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
 
 
 
-# num larvae ------------------------------------------------------------------
+# Class distributions ---------------------------------------------------------
 #
 #------------------------------------------------------------------------------
-df_adult = df[df["label_id"]<6]
+
+#loading the class labels
+clss = pd.read_csv(color_csv)
 
 
-data  = df_to_grouped_array(df_adult,"group_identifier","area")
-plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors)
 
-df_LH = df_adult[df_adult["is_LH"]==1]
-data  = df_to_grouped_array(df_LH,"generation","area")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
-
-
-df_0G = df_adult[df_adult["is_0G"]==1]
-data  = df_to_grouped_array(df_0G,"generation","area")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+df_LH = df[df["is_LH"]==1]
+data = df_LH["label_id"]
+class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95])
+for i in range(1,4):
+    df_LH_x = df_LH[df_LH["generation"]==i]
+    data = df_LH_x["label_id"]
+    class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95])
 
 
-df_NG = df_adult[df_adult["is_NG"]==1]
-data  = df_to_grouped_array(df_NG,"generation","area")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+df_0G = df[df["is_0G"]==1]
+data = df_0G["label_id"]
+class_histogram(data,clss,show_counts=True,color = [0.95,0.24,0.08],normalize=True)
+for i in range(1,4):
+    df_0G_x = df_0G[df_0G["generation"]==i]
+    data = df_0G_x["label_id"]
+    class_histogram(data,clss,show_counts=True,color = [0.95,0.24,0.08],normalize=True)
 
+df_NG = df[df["is_NG"]==1]
+data = df_NG["label_id"]
+class_histogram(data,clss,show_counts=True,color = [0.6,0.6,0.6])
+for i in range(1,4):
+    df_NG_x = df_NG[df_NG["generation"]==i]
+    data = df_NG_x["label_id"]
+    class_histogram(data,clss,show_counts=True,color = [0.6,0.6,0.6])
 
 
 
