@@ -18,6 +18,7 @@ from skimage.draw import polygon as sk_polygon
 from shapely.geometry import Polygon, Point, LineString
 from pathlib import Path
 
+from skimage import filters
 
 from scipy.signal import savgol_filter
 
@@ -430,7 +431,7 @@ def find_head_tail(c, dS, bloc_int, debug=False):
     return head, tail
 
 
-def color_deconvolution(image_path, color_matrix, output_dir, prefix="c"):
+def color_deconvolution(img,basename, color_matrix, output_dir, prefix="c"):
     """
     Performs color deconvolution on an RGB image using a custom color ratio matrix.
     
@@ -445,13 +446,9 @@ def color_deconvolution(image_path, color_matrix, output_dir, prefix="c"):
     prefix : str, optional
         Filename prefix for output images (default: "channel").
     """
-    _,basename=os.path.split(image_path)
-    basename=basename[1:-4]
-    # --- 1. Load image ---
     
-    img = cv2.imread(image_path)
     if img is None:
-        raise ValueError(f"Could not read image: {image_path}")
+        raise ValueError(f"Could not read image: {basename}")
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img_float = img.astype(np.float32) + 1e-6  # avoid log(0)
 
@@ -658,9 +655,22 @@ def analyze_image_with_annotations(image_path, annotations, color_matrix,output_
     list of dict
         [{'area_id': ..., 'intensity': ...}, ...]
     """
+   
+    # load imge
     _,basename=os.path.split(image_path)
     basename=basename[1:-4]
-    separated,orig_img = color_deconvolution(image_path, color_matrix,output_dir)
+    # --- 1. Load image ---
+    
+    img = cv2.imread(image_path)
+    
+    
+    
+    if settings['AWB'][0]:
+        print()
+        img = awb(img,quantile=settings['AWB'][1],debug=False)
+  
+        
+    separated,orig_img = color_deconvolution(img,basename, color_matrix,output_dir)
   
     red_channel = make_8bit_img(separated[:,:,0])
     green_channel = make_8bit_img(separated[:,:,1])
@@ -1853,6 +1863,83 @@ def get_worm_centerline_legacy(poly, plot=False, padding=10):
         plt.show()
 
     return centerline, length, area
+
+###############################################################################
+#
+# helper functions
+#
+###############################################################################
+def dtype_max(im):
+    if np.issubdtype(im.dtype, np.integer):
+        return np.iinfo(im.dtype).max
+    elif np.issubdtype(im.dtype, np.floating):
+        return 1.0
+    else:
+        raise TypeError(f"Unsupported dtype: {im.dtype}")
+
+
+def awb(im, quantile=0.15, debug=False, base_level=224):
+    im = im.astype(float)
+    h, w, c = im.shape
+
+    for i in range(c):
+        subIm = im[:, :, i]
+
+        # ----------------------------
+        # Algorithmic thresholding
+        # ----------------------------#
+        if isinstance(quantile, (str, np.str_)):
+            q = quantile.lower()
+            
+            if q == "otsu":
+                thr = filters.threshold_otsu(subIm)
+            elif q == "yen":
+                thr = filters.threshold_yen(subIm)
+            elif q == "triangle":
+                thr = filters.threshold_triangle(subIm)
+            elif q == "li":
+                thr = filters.threshold_li(subIm)
+            elif q == "mean":
+                thr = np.mean(subIm)
+            else:
+                raise ValueError(f"Unknown thresholding method: {quantile}")
+            
+
+            idx = subIm < thr
+
+        # ----------------------------
+        # Quantile thresholding
+        # ----------------------------
+        elif isinstance(quantile, (float, int)):
+            if not (0 <= quantile <= 1):
+                raise ValueError("Quantile must be in [0,1]")
+            thr = np.quantile(subIm, quantile)
+            idx = subIm > thr
+
+        else:
+            raise TypeError(
+                "quantile must be a float in [0,1] or a string "
+                "(otsu, yen, triangle, li, mean)"
+            )
+            
+        mean_val = np.mean(subIm[idx])
+        
+        if debug:
+            dspIm = copy.copy(subIm)
+            dspIm[idx] = 0
+            plt.imshow(dspIm, cmap="gray")
+            plt.title(f"Channel {i} | threshold={thr:.2f}")
+            plt.colorbar()
+            plt.show()
+        
+        if mean_val > 0:
+            scale = base_level / mean_val
+            im[:, :, i] *= scale
+
+    return np.clip(im, 0, 255).astype(np.uint8)
+
+
+
 
 ###############################################################################
 #

@@ -41,7 +41,7 @@ settings = {"rim_score_cutoff":0.05,"debug":True,"use_classifier":True}
 collect_annotations(settings,
     anno_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/labels', # this is where there raw annoations go
     image_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images', # this is where the images are sitting
-    color_csv='/media/my_device/space worms/makesenseai_analyzed_images/classes/class_colors.csv', 
+    color_csv='/home/wormulon/models/worm_analytic_suite/class_colors.csv', 
     output_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output' #This is where the joined labels go 
 )
 
@@ -56,7 +56,7 @@ collect_annotations(settings,
 image_dir = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/' # this is where the images are sitting
 point_csv =  '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_points.csv'
 area_json =  "/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json"
-color_csv =  '/media/my_device/space worms/makesenseai_analyzed_images/classes/class_colors.csv'
+color_csv =  '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
 
 tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
 
@@ -104,8 +104,9 @@ color_matrix = np.array([
 
 color_matrix = color_matrix.transpose()
 settings = {"rim_score_cutoff":0.09,
-            "imsize":3120}
-
+            "imsize":3120,
+            "AWB":[True,0.05]}
+            
 
 df = analyze_staining_from_json('/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json',
     '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/',color_matrix,settings,
