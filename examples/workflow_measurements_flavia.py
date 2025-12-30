@@ -153,7 +153,7 @@ group_colors = np.array([[0.6,0.6,0.6],[0.15,0.45,0.95],[0.95,0.24,0.08]])
 dfX = pd.concat((df1,df2,df3))
 s=dfX.loc[:,['percent_0.6', 'percent_0.65','percent_0.7','percent_0.75']]
 dfX["width_average"] = s.mean(axis=1)
-data  = df_to_grouped_array(dfX,"generation","percent_0.5")
+data,grps  = df_to_grouped_array(dfX,"generation","percent_0.5")
 
 colors = np.array([[0.95,0.35,0.05],[0.65,0.1,0.05],[0.5,0.05,0.05]])
 plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
@@ -163,25 +163,25 @@ plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
 df_adult = df[df["label_id"]<6]
 
 
-data  = df_to_grouped_array(df_adult,"group_identifier","intensity")
-plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors,logY=True)
+data,grps  = df_to_grouped_array(df_adult,"group_identifier","intensity")
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,logY=True)
 
 df_LH = df_adult[df_adult["is_LH"]==1]
-data  = df_to_grouped_array(df_LH,"generation","intensity")
+data,grps  = df_to_grouped_array(df_LH,"generation","intensity")
 colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
 
 
 df_0G = df_adult[df_adult["is_0G"]==1]
-data  = df_to_grouped_array(df_0G,"generation","intensity")
+data,grps  = df_to_grouped_array(df_0G,"generation","intensity")
 colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
 
 
 df_NG = df_adult[df_adult["is_NG"]==1]
-data  = df_to_grouped_array(df_NG,"generation","intensity")
+data,grps  = df_to_grouped_array(df_NG,"generation","intensity")
 colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,logY=True)
 
 
 
@@ -192,25 +192,25 @@ plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
 df_adult = df[df["label_id"]<6]
 
 
-data  = df_to_grouped_array(df_adult,"group_identifier","area")
-plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors)
+data,grps  = df_to_grouped_array(df_adult,"group_identifier","area")
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
 
 df_LH = df_adult[df_adult["is_LH"]==1]
-data  = df_to_grouped_array(df_LH,"generation","area")
+data,grps  = df_to_grouped_array(df_LH,"generation","area")
 colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
 
 
 df_0G = df_adult[df_adult["is_0G"]==1]
-data  = df_to_grouped_array(df_0G,"generation","area")
+data,grps  = df_to_grouped_array(df_0G,"generation","area")
 colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
 
 
 df_NG = df_adult[df_adult["is_NG"]==1]
-data  = df_to_grouped_array(df_NG,"generation","area")
+data,grps  = df_to_grouped_array(df_NG,"generation","area")
 colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
 
 
 
@@ -221,25 +221,25 @@ plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
 df_adult = df[df["label_id"]<6]
 
 
-data  = df_to_grouped_array(df_adult,"group_identifier","length")
-plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors)
+data,grps  = df_to_grouped_array(df_adult,"group_identifier","length")
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors)
 
 df_LH = df_adult[df_adult["is_LH"]==1]
-data  = df_to_grouped_array(df_LH,"generation","length")
+data,grps  = df_to_grouped_array(df_LH,"generation","length")
 colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 
 df_0G = df_adult[df_adult["is_0G"]==1]
-data  = df_to_grouped_array(df_0G,"generation","length")
+data,grps  = df_to_grouped_array(df_0G,"generation","length")
 colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 
 df_NG = df_adult[df_adult["is_NG"]==1]
-data  = df_to_grouped_array(df_NG,"generation","length")
+data,grps  = df_to_grouped_array(df_NG,"generation","length")
 colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 
 

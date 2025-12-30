@@ -33,6 +33,10 @@ from scipy.spatial.distance import cdist
 from scipy.interpolate import interp1d
 from classifiers import classify,angle_histogram
 import importlib.resources as r
+from scipy.spatial.distance import cdist
+from scipy.signal import savgol_filter
+
+
 
 
 def analyze_annotations(areas_json, points_csv, image_dir,settings, analysis_func):
@@ -1467,10 +1471,6 @@ def resample_to_regular_spacing(coords, min_points=220):
     resampled_coords = np.column_stack((fx(new_cumdist), fy(new_cumdist)))
     return resampled_coords
 
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.spatial.distance import cdist
-from scipy.signal import savgol_filter
 
 def get_worm_centerline_sliding(poly, head, tail, window_size=5, smooth_win=15, smooth_poly=3, multiplier=3, plot=False, debug=False, padding=5):
     

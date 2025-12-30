@@ -14,19 +14,18 @@ import matplotlib.pyplot as plt
 
 def df_to_grouped_array(df: pd.DataFrame, sort_col: str, value_col: str):
     # Group by sort_col and extract lists of value_col
-    groups = df.groupby(sort_col)[value_col].apply(list)
-
+    groups = df.groupby(sort_col, sort=False)[value_col].apply(list)
+    
+    # Capture the order of the unique sort_col values
+    order = groups.index.to_list()
+    
     # Find the maximum group length to pad uneven groups
     max_len = max(len(lst) for lst in groups)
-
-    # Create a 2D numpy array (rows: values, columns: unique sort groups)
     result = np.full((max_len, len(groups)), np.nan)
-
-    # Fill array column by column
     for i, lst in enumerate(groups):
         result[:len(lst), i] = lst
-
-    return result
+    
+    return result, order
 
 
 def filter_dataframe(df, columns, values):
