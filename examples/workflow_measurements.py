@@ -27,23 +27,23 @@ from annotation_tool_v8 import AnnotationTool
 ##---------------------------------------------------------------------------##
 
 
-## this copies all the files together into a single image directory 
-## and a single labels directory (output)
+# ## this copies all the files together into a single image directory 
+# ## and a single labels directory (output)
 
-organize_dataset("/media/my_device/space worms/makesenseai_analyzed_images/to analyze")
+# organize_dataset("/media/my_device/space worms/makesenseai_analyzed_images/to analyze")
 
 
 
-##---------------------------------------------------------------------------##
-## this joins the labels and throws out bad labels. 
+# ##---------------------------------------------------------------------------##
+# ## this joins the labels and throws out bad labels. 
 
-settings = {"rim_score_cutoff":0.05,"debug":True,"use_classifier":True}
-collect_annotations(settings,
-    anno_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/labels', # this is where there raw annoations go
-    image_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images', # this is where the images are sitting
-    color_csv='/home/wormulon/models/worm_analytic_suite/class_colors.csv', 
-    output_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output' #This is where the joined labels go 
-)
+# settings = {"rim_score_cutoff":0.05,"debug":False,"use_classifier":True}
+# collect_annotations(settings,
+#     anno_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/labels', # this is where there raw annoations go
+#     image_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images', # this is where the images are sitting
+#     color_csv='/home/wormulon/models/worm_analytic_suite/class_colors.csv', 
+#     output_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output' #This is where the joined labels go 
+# )
 
 
 ##---------------------------------------------------------------------------##
@@ -105,7 +105,8 @@ color_matrix = np.array([
 color_matrix = color_matrix.transpose()
 settings = {"rim_score_cutoff":0.09,
             "imsize":3120,
-            "AWB":[True,0.05]}
+            "AWB":[True,0.05],
+            "debug":False}
             
 
 df = analyze_staining_from_json('/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json',
@@ -117,7 +118,7 @@ df = analyze_staining_from_json('/media/my_device/space worms/makesenseai_analyz
 #            A S S I G N I N G   C O N D I T I O N   L A B E L S 
 ##---------------------------------------------------------------------------##
 
-df2 =assign_conditions(df,col_name ="image_name_y")
+df2 = assign_conditions(df,col_name ="image_name_y")
 df2 = create_group_labels(df2)
 
 ##---------------------------------------------------------------------------##

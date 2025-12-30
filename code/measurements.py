@@ -513,7 +513,7 @@ def get_centerline_wrapper(area_coords, head_coords, ol_tail):
     
     try:
         if selfoverlap:
-            centerline,_,area = get_worm_centerline_sliding(area_coords, head_coords, ol_tail, window_size=5, multiplier=1, smooth_win=15, smooth_poly=3, plot=True, debug=True)
+            centerline,_,area = get_worm_centerline_sliding(area_coords, head_coords, ol_tail, window_size=5, multiplier=1, smooth_win=15, smooth_poly=3, plot=True, debug=False)
 
         else: 
             centerline,_,area = get_worm_centerline(area_coords, plot=False, padding=10)
@@ -589,7 +589,7 @@ def match_head_tail(area_coords, points_df):
         return None, None
 
     # Find predicted head/tail endpoints
-    p1, p2 = find_head_tail(area_coords, 1, int(area_coords.shape[0]/10), debug=True)
+    p1, p2 = find_head_tail(area_coords, 1, int(area_coords.shape[0]/10), debug=False)
 
     def closest_point(target):
         """Return closest annotated point and its label."""
@@ -637,7 +637,7 @@ def make_8bit_img(mat):
     return img
 
 
-def analyze_image_with_annotations(image_path, annotations, color_matrix,output_dir,settings,debug=True):
+def analyze_image_with_annotations(image_path, annotations, color_matrix,output_dir,settings):
     """
     Deconvolves image and measures summed intensity per annotation.
     
@@ -688,7 +688,7 @@ def analyze_image_with_annotations(image_path, annotations, color_matrix,output_
         try:
             #centerline,area = get_centerline_wrapper(coords, head_coords, ol_tail)
             
-            centerline,length,area = get_worm_centerline(coords, plot=debug, padding=10)
+            centerline,length,area = get_worm_centerline(coords, plot=settings['debug'], padding=10)
     
             centerline = smooth_pts(centerline, win=31, poly=3)
             
