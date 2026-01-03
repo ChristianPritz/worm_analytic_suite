@@ -11,11 +11,13 @@ Description-Content-Type: text/markdown
 Requires-Dist: numpy
 Requires-Dist: pandas
 Requires-Dist: scipy
+Requires-Dist: networkX
 Requires-Dist: pillow
 Requires-Dist: shapely
 Requires-Dist: scikit-learn
 Requires-Dist: scikit-image
 Requires-Dist: matplotlib
+Requires-Dist: opencv-python-headless
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: pytest-cov; extra == "dev"
@@ -24,8 +26,22 @@ Requires-Dist: black; extra == "dev"
 Requires-Dist: ruff; extra == "dev"
 Dynamic: author
 Dynamic: classifier
+Dynamic: description
 Dynamic: description-content-type
 Dynamic: provides-extra
 Dynamic: requires-dist
 Dynamic: requires-python
 Dynamic: summary
+
+# worm_analytic_suite
+
+## Purpose
+
+Pipeline for high-throughput analysis of nematode Axioscan images.
+
+WORK IN PROGRESS -
+
+TESTING STAGE - DO NOT USE! 
+
+----
+

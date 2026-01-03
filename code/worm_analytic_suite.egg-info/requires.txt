@@ -1,11 +1,13 @@
 numpy
 pandas
 scipy
+networkX
 pillow
 shapely
 scikit-learn
 scikit-image
 matplotlib
+opencv-python-headless
 
 [dev]
 pytest>=7.0

@@ -53,10 +53,10 @@ from annotation_tool_v8 import AnnotationTool
 #
 ##---------------------------------------------------------------------------##
 
-image_dir = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/' # this is where the images are sitting
-point_csv =  '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_points.csv'
-area_json =  "/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json"
-color_csv =  '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
+image_dir = '/home/christian/Documents/data/space worms/images' # this is where the images are sitting
+point_csv =  '/home/christian/Documents/data/space worms/output/annotations_points.csv'
+area_json =  '/home/christian/Documents/data/space worms/output/annotations_areas.json'
+color_csv =  '/home/christian/models/worm_analytic_suite/class_colors.csv'
 
 tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
 
@@ -76,11 +76,11 @@ tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
 ##---------------------------------------------------------------------------##
 #             A N A L Y Z E    T H E    S H A P E S
 ##---------------------------------------------------------------------------##
-settings = {"rim_score_cutoff":0.05,"debug":True,"use_classifier":True}
+settings = {"rim_score_cutoff":0.05,"debug":False,"use_classifier":True}
 df = analyze_annotations(
-    areas_json='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json',
-    points_csv='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_points.csv',
-    image_dir='/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/',
+    areas_json=area_json,
+    points_csv=point_csv,
+    image_dir=image_dir,
     settings=settings,
     analysis_func=analyze_thickness
 )
@@ -109,17 +109,17 @@ settings = {"rim_score_cutoff":0.09,
             "debug":False}
             
 
-df = analyze_staining_from_json('/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json',
-    '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/',color_matrix,settings,
-    output_dir = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/',
+df = analyze_staining_from_json(area_json,
+    image_dir,color_matrix,settings,
+    output_dir = '/home/christian/Documents/data/space worms/images/output/',
     df=df)
 
 ##---------------------------------------------------------------------------##
 #            A S S I G N I N G   C O N D I T I O N   L A B E L S 
 ##---------------------------------------------------------------------------##
 
-df2 = assign_conditions(df,col_name ="image_name_y")
-df2 = create_group_labels(df2)
+df = assign_conditions(df,col_name ="image_name_y")
+df = create_group_labels(df)
 
 ##---------------------------------------------------------------------------##
 #                 Plotting
@@ -134,59 +134,42 @@ cols = ['percent_0.05', 'percent_0.1', 'percent_0.15', 'percent_0.2',
 percents = np.arange(0.05,1,0.05)
 
 
-from worm_plotter import worm_width_plot, filter_dataframe
+from worm_plotter import worm_width_plot, filter_dataframe,df_to_grouped_array
 
 
-df4 = filter_dataframe(df, ["is_NG","generation","label_id"], [1,3,[4,5,9,8]])
-df5 = filter_dataframe(df, ["is_0G","generation","label_id"], [1,3,[4,5,9,8]])
+# worm width plot------------------------------------------------------------##
+df4 = filter_dataframe(df, ["is_NG","generation","label_id"], [1,3,[4]])
+df5 = filter_dataframe(df, ["is_0G","generation","label_id"], [1,3,[4]])
 
 df_list = [df4,df5]
 
 flips = [False,False]
 colors = np.array([[0.05,0.15,0.95],[0.95,0.35,0.05]])
-
  
 worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
-
 worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
-
-
 
 
 
 #across_generations:-0G--------------------------------------------------------
 
-df1 = filter_dataframe(df, ["is_NG","generation","label_id"], [1,3,[4]])
-
+# sorting the data into generations 
 df1 = filter_dataframe(df, ["is_0G","generation","label_id"], [1,1,[4]])    
 df2 = filter_dataframe(df, ["is_0G","generation","label_id"], [1,2,[4]])    
 df3 = filter_dataframe(df, ["is_0G","generation","label_id"], [1,3,[4]])    
 
 colors = np.array([[0.05,0.15,0.95],[0.95,0.35,0.05]])
+
+#generation 1 vs 2
 df_list = [df1,df2] #blue, #red
 worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=False)
+#generation 2 vs 3
 df_list = [df2,df3] #blue, #red
 worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=False)
+#generation 1 vs 3
 df_list = [df1,df3] #blue, #red
 worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=False)
-df_list = [df1,df2] #blue, #red
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=True)
-df_list = [df2,df3] #blue, #red
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=True)
-df_list = [df1,df3] #blue, #red
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=True)
 
-
-df1 = filter_dataframe(df, ["is_0G","generation","label_id"], [1,1,[5]])    
-df2 = filter_dataframe(df, ["is_0G","generation","label_id"], [1,2,[5]])    
-df3 = filter_dataframe(df, ["is_0G","generation","label_id"], [1,3,[5]])    
-
-df_list = [df1,df2]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=False)
-df_list = [df2,df3]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=False)
-df_list = [df1,df3]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=False)
 
 df_list = [df1,df2] #blue, #red
 worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=True)
@@ -196,117 +179,123 @@ df_list = [df1,df3] #blue, #red
 worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=3,scale_by_length=True)
 
 
+#STAINING INTENSITY across_generations:-NG--------------------------------------------------------
+group_colors = np.array([[0.95,0.24,0.08],[0.15,0.45,0.95],[0.6,0.6,0.6]])
+df_adult = df[df["label_id"]==4]
 
-# STAINING---------------------------------------------------------------------
-#
-#------------------------------------------------------------------------------
-#across_generations:-NG--------------------------------------------------------
-group_colors = np.array([[0.6,0.6,0.6],[0.15,0.45,0.95],[0.95,0.24,0.08]])
-  
-            
+data,grps  = df_to_grouped_array(df_adult,"group_identifier","intensity")
+print(grps)
 
-
-dfX = pd.concat((df1,df2,df3))
-s=dfX.loc[:,['percent_0.6', 'percent_0.65','percent_0.7','percent_0.75']]
-dfX["width_average"] = s.mean(axis=1)
-data  = df_to_grouped_array(dfX,"generation","percent_0.5")
-
-colors = np.array([[0.95,0.35,0.05],[0.65,0.1,0.05],[0.5,0.05,0.05]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
-
-#across_generations:-NG--------------------------------------------------------
-
-df_adult = df[df["label_id"]<6]
-
-
-data  = df_to_grouped_array(df_adult,"group_identifier","intensity")
-plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors,logY=True)
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,logY=True)
 
 df_LH = df_adult[df_adult["is_LH"]==1]
-data  = df_to_grouped_array(df_LH,"generation","intensity")
+data,grps  = df_to_grouped_array(df_LH,"generation","intensity")
 colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
 
 
 df_0G = df_adult[df_adult["is_0G"]==1]
-data  = df_to_grouped_array(df_0G,"generation","intensity")
+data,grps  = df_to_grouped_array(df_0G,"generation","intensity")
 colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
 
 
 df_NG = df_adult[df_adult["is_NG"]==1]
-data  = df_to_grouped_array(df_NG,"generation","intensity")
+data,grps  = df_to_grouped_array(df_NG,"generation","intensity")
 colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors,logY=True)
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,logY=True)
 
+
+# WIDTH -----------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+df_adult = df[df["label_id"]<6]
+s=df_adult.loc[:,['percent_0.5','percent_0.55','percent_0.6', 'percent_0.65','percent_0.7','percent_0.75']]
+df_adult["width_average"] = s.mean(axis=1)
+data,grps  = df_to_grouped_array(df_adult,"group_identifier","width_average")
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
+
+# across_generations:-LG-------------------------------------------------------
+df_LH = df_adult[df_adult["is_NG"]==1]
+data,grps  = df_to_grouped_array(df_LH,"generation","width_average")
+colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+
+# across_generations:-0G-------------------------------------------------------
+df_0G = df_adult[df_adult["is_0G"]==1]
+data,grps  = df_to_grouped_array(df_0G,"generation","width_average")
+colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+
+# across_generations:-0G-------------------------------------------------------
+df_NG = df_adult[df_adult["is_NG"]==1]
+data,grps  = df_to_grouped_array(df_NG,"generation","width_average")
+colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 
 
 # AREA---------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
-df_adult = df[df["label_id"]<6]
+df_adult = df[df["label_id"]==4]
 
-
-data  = df_to_grouped_array(df_adult,"group_identifier","area")
-plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors)
+data,grps  = df_to_grouped_array(df_adult,"group_identifier","area")
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
 
 df_LH = df_adult[df_adult["is_LH"]==1]
-data  = df_to_grouped_array(df_LH,"generation","area")
+data,grps  = df_to_grouped_array(df_LH,"generation","area")
 colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
 
 
 df_0G = df_adult[df_adult["is_0G"]==1]
-data  = df_to_grouped_array(df_0G,"generation","area")
+data,grps  = df_to_grouped_array(df_0G,"generation","area")
 colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
 
 
 df_NG = df_adult[df_adult["is_NG"]==1]
-data  = df_to_grouped_array(df_NG,"generation","area")
+data,grps  = df_to_grouped_array(df_NG,"generation","area")
 colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
 
 
-
-
-# Length---------------------------------------------------------------------
+# Length-----------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
 df_adult = df[df["label_id"]<6]
 
 
-data  = df_to_grouped_array(df_adult,"group_identifier","length")
-plot_grouped_values(data, ["NG",'LH','0G'],figsize=[3.5,6],colors=group_colors)
+data,grps  = df_to_grouped_array(df_adult,"group_identifier","length")
+plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors)
 
 df_LH = df_adult[df_adult["is_LH"]==1]
-data  = df_to_grouped_array(df_LH,"generation","length")
+data,grps  = df_to_grouped_array(df_LH,"generation","length")
 colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 
 df_0G = df_adult[df_adult["is_0G"]==1]
-data  = df_to_grouped_array(df_0G,"generation","length")
+data,grps  = df_to_grouped_array(df_0G,"generation","length")
 colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 
 df_NG = df_adult[df_adult["is_NG"]==1]
-data  = df_to_grouped_array(df_NG,"generation","length")
+data,grps  = df_to_grouped_array(df_NG,"generation","length")
 colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data, ["1",'2','3'],figsize=[3.5,6],colors=colors)
+plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 
 
-# Class distributions ---------------------------------------------------------
+# Larval and life stage distributions -----------------------------------------
 #
 #------------------------------------------------------------------------------
 
 #loading the class labels
+color_csv =  '/home/christian/models/worm_analytic_suite/class_colors.csv'
 clss = pd.read_csv(color_csv)
-
-
 
 df_LH = df[df["is_LH"]==1]
 data = df_LH["label_id"]
@@ -315,7 +304,6 @@ for i in range(1,4):
     df_LH_x = df_LH[df_LH["generation"]==i]
     data = df_LH_x["label_id"]
     class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95])
-
 
 df_0G = df[df["is_0G"]==1]
 data = df_0G["label_id"]
@@ -332,6 +320,4 @@ for i in range(1,4):
     df_NG_x = df_NG[df_NG["generation"]==i]
     data = df_NG_x["label_id"]
     class_histogram(data,clss,show_counts=True,color = [0.6,0.6,0.6])
-
-
 

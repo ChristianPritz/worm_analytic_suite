@@ -12,20 +12,36 @@ import matplotlib.pyplot as plt
 
 
 
+# def df_to_grouped_array(df: pd.DataFrame, sort_col: str, value_col: str):
+#     # Group by sort_col and extract lists of value_col
+#     groups = df.groupby(sort_col, sort=False)[value_col].apply(list)
+    
+#     # Capture the order of the unique sort_col values
+#     order = groups.index.to_list()
+    
+#     # Find the maximum group length to pad uneven groups
+#     max_len = max(len(lst) for lst in groups)
+#     result = np.full((max_len, len(groups)), np.nan)
+#     for i, lst in enumerate(groups):
+#         result[:len(lst), i] = lst
+    
+#     return result, order
+
 def df_to_grouped_array(df: pd.DataFrame, sort_col: str, value_col: str):
-    # Group by sort_col and extract lists of value_col
-    groups = df.groupby(sort_col, sort=False)[value_col].apply(list)
+    print("Carving")
+    un_val = np.unique(df[sort_col])
     
-    # Capture the order of the unique sort_col values
-    order = groups.index.to_list()
+    result = np.full((len(df), len(un_val)), np.nan)
+    for idx,i in enumerate(un_val):
+        vals = df[value_col][df[sort_col] == i]
+        result[0:len(vals),idx] = vals;
+     
+    result = result[np.sum(~np.isnan(result),1)==result.shape[1]]
+    return result, un_val 
     
-    # Find the maximum group length to pad uneven groups
-    max_len = max(len(lst) for lst in groups)
-    result = np.full((max_len, len(groups)), np.nan)
-    for i, lst in enumerate(groups):
-        result[:len(lst), i] = lst
     
-    return result, order
+    
+
 
 
 def filter_dataframe(df, columns, values):

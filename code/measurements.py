@@ -93,7 +93,7 @@ def analyze_annotations(areas_json, points_csv, image_dir,settings, analysis_fun
             tail_coords = (float(tail.iloc[1]), float(tail.iloc[2]))
 
             # Run user analysis function
-            analysis_out = analysis_func(area, head_coords, tail_coords,ol_tail, str(img_path))
+            analysis_out = analysis_func(area, head_coords, tail_coords,ol_tail, str(img_path),settings)
 
             # Format output
             if isinstance(analysis_out, dict):
@@ -511,13 +511,13 @@ def coco_segmentation_to_array(area):
     return coords
 
 
-def get_centerline_wrapper(area_coords, head_coords, ol_tail):
+def get_centerline_wrapper(area_coords, head_coords, ol_tail,settings):
     selfoverlap = check_self_overlap(area_coords)
     
     
     try:
         if selfoverlap:
-            centerline,_,area = get_worm_centerline_sliding(area_coords, head_coords, ol_tail, window_size=5, multiplier=1, smooth_win=15, smooth_poly=3, plot=True, debug=False)
+            centerline,_,area = get_worm_centerline_sliding(area_coords, head_coords, ol_tail, window_size=5, multiplier=1, smooth_win=15, smooth_poly=3, debug=settings["debug"])
 
         else: 
             centerline,_,area = get_worm_centerline(area_coords, plot=False, padding=10)
@@ -526,7 +526,7 @@ def get_centerline_wrapper(area_coords, head_coords, ol_tail):
         
     return centerline, area
 
-def analyze_thickness(area, head_coords, tail_coords,ol_tail, image_path):
+def analyze_thickness(area, head_coords, tail_coords,ol_tail, image_path,settings):
 
     area_coords =coco_segmentation_to_array(area)
     
@@ -535,7 +535,7 @@ def analyze_thickness(area, head_coords, tail_coords,ol_tail, image_path):
     
     print(area_coords.shape[0])
     
-    centerline,area = get_centerline_wrapper(area_coords, head_coords, ol_tail)
+    centerline,area = get_centerline_wrapper(area_coords, head_coords, ol_tail,settings)
     
     #head_coords, tail_coords = find_head_tail(area_coords, 1, int(area_coords.shape[0]/10), debug=True) #settings
     
@@ -553,7 +553,7 @@ def analyze_thickness(area, head_coords, tail_coords,ol_tail, image_path):
         length = np.nan
     else:
         try: 
-            thicks,length = measure_tube_thickness(area_coords,centerline,head_coords,tail_coords,percents = percents, debug=True)
+            thicks,length = measure_tube_thickness(area_coords,centerline,head_coords,tail_coords,percents = percents, debug=settings["debug"])
         except:
             thicks = error
             length = np.nan
@@ -633,11 +633,12 @@ def make_8bit_img(mat):
     mat = mat / np.max(mat)             # normalize to 0-1
     mat = np.round(mat * 255)           # scale to 0-255
     img = mat.astype(np.uint8)  
-    fig, ax = plt.subplots()
-    im = ax.imshow(img, cmap='gray_r')  # grayscale colormap
-    cbar = fig.colorbar(im, ax=ax)            # add colorbar
-    cbar.set_label('Intensity')               # optional label
-    plt.show()    
+    
+    # fig, ax = plt.subplots()
+    # im = ax.imshow(img, cmap='gray_r')  # grayscale colormap
+    # cbar = fig.colorbar(im, ax=ax)            # add colorbar
+    # cbar.set_label('Intensity')               # optional label
+    # plt.show()    
     return img
 
 
@@ -1472,7 +1473,7 @@ def resample_to_regular_spacing(coords, min_points=220):
     return resampled_coords
 
 
-def get_worm_centerline_sliding(poly, head, tail, window_size=5, smooth_win=15, smooth_poly=3, multiplier=3, plot=False, debug=False, padding=5):
+def get_worm_centerline_sliding(poly, head, tail, window_size=5, smooth_win=15, smooth_poly=3, multiplier=3, debug=False, padding=5):
     
     def resample_fixed_n(coords, n_points):
         """Resample a 2D polyline to exactly n_points, evenly spaced along its arc-length."""
@@ -1570,10 +1571,10 @@ def get_worm_centerline_sliding(poly, head, tail, window_size=5, smooth_win=15, 
     midline_points = []
     
 
-    
-    fig,ax = plt.subplots()
-    for i in range(half1.shape[0]-1):
-        ax.plot(half1[i:i+1,0],half1[i:i+1,0])
+    if debug: 
+        fig,ax = plt.subplots()
+        for i in range(half1.shape[0]-1):
+            ax.plot(half1[i:i+1,0],half1[i:i+1,0])
     
     for i in range(n_half1 - window_size + 1):
         idx1_window = np.arange(i, i + window_size)
@@ -1624,12 +1625,12 @@ def get_worm_centerline_sliding(poly, head, tail, window_size=5, smooth_win=15, 
     area = np.sum(mask)
 
     # --- optional plot ---
-    if plot or debug:
+    if debug:
         plt.figure(figsize=(8,6))
         plt.plot(poly[:,0], poly[:,1], 'k-', label='Outline')
-        if debug:
-            plt.plot(half1[:,0], half1[:,1], 'r.-', label='Half 1 (template)')
-            plt.plot(half2[:,0], half2[:,1], 'b.-', label='Half 2')
+       
+        plt.plot(half1[:,0], half1[:,1], 'r.-', label='Half 1 (template)')
+        plt.plot(half2[:,0], half2[:,1], 'b.-', label='Half 2')
         plt.plot(midline[:,0], midline[:,1], 'k-', lw=2, label='Centerline')
         plt.scatter(head[0], head[1], c='g', s=50, label='Head')
         plt.scatter(tail[0], tail[1], c='m', s=50, label='Tail')
