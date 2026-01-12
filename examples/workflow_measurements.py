@@ -53,10 +53,20 @@ from annotation_tool_v8 import AnnotationTool
 #
 ##---------------------------------------------------------------------------##
 
+
+## home:
 image_dir = '/home/christian/Documents/data/space worms/images' # this is where the images are sitting
 point_csv =  '/home/christian/Documents/data/space worms/output/annotations_points.csv'
 area_json =  '/home/christian/Documents/data/space worms/output/annotations_areas.json'
 color_csv =  '/home/christian/models/worm_analytic_suite/class_colors.csv'
+
+
+## werk: 
+image_dir = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images' # this is where the images are sitting
+point_csv =  '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_points.csv'
+area_json =  '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json'
+color_csv =  '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
+
 
 tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
 
@@ -76,7 +86,7 @@ tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
 ##---------------------------------------------------------------------------##
 #             A N A L Y Z E    T H E    S H A P E S
 ##---------------------------------------------------------------------------##
-settings = {"rim_score_cutoff":0.05,"debug":False,"use_classifier":True}
+settings = {"rim_score_cutoff":0.05,"debug":False,"use_classifier":False}
 df = analyze_annotations(
     areas_json=area_json,
     points_csv=point_csv,

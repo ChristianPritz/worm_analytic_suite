@@ -37,65 +37,95 @@ from scipy.spatial.distance import cdist
 from scipy.signal import savgol_filter
 
 
-
-
-def analyze_annotations(areas_json, points_csv, image_dir,settings, analysis_func):
+def interpolate_centerline(center_line, n_points=40):
     """
-    Iterate over all area annotations, match with closest head/tail points,
-    and run a user-defined analysis function.
-    
+    Interpolate a 2D centerline to a fixed number of points using
+    arc-length parameterization.
+
     Parameters
     ----------
-    areas_json : str
-        Path to JSON file containing area annotations.
-    points_csv : str
-        Path to CSV file containing point annotations.
-    image_dir : str
-        Path to image directory.
-    analysis_func : callable
-        Function that receives (area, head_coords, tail_coords, image_path)
-        and returns a dict, list, or scalar with analysis results.
-    
+    center_line : array-like, shape (N, 2)
+    n_points : int
+
     Returns
     -------
-    pd.DataFrame
-        DataFrame with area_id, image_name, matched points, coordinates, and analysis results.
+    np.ndarray of shape (n_points, 2) or None if invalid
     """
+    cl = np.asarray(center_line, dtype=float)
+
+    # Basic validity checks
+    if cl.ndim != 2 or cl.shape[1] != 2:
+        return None
+    if cl.shape[0] < 2:
+        return None
+    if np.isnan(cl).any():
+        return None
+
+    # Compute cumulative arc length
+    diffs = np.diff(cl, axis=0)
+    seg_lengths = np.linalg.norm(diffs, axis=1)
+    cumlen = np.insert(np.cumsum(seg_lengths), 0, 0.0)
+
+    total_len = cumlen[-1]
+    if total_len == 0:
+        return None
+
+    # Uniform sampling along arc length
+    target_len = np.linspace(0, total_len, n_points)
+
+    x = np.interp(target_len, cumlen, cl[:, 0])
+    y = np.interp(target_len, cumlen, cl[:, 1])
+
+    return np.stack([x, y], axis=1)
+
+
+
+def analyze_annotations(areas_json, points_csv, image_dir, settings, analysis_func):
+    """
+    Iterate over all area annotations, match with closest head/tail points,
+    run a user-defined analysis function, and write centerline keypoints
+    back into the SAME COCO JSON annotation file.
+    """
+
+    # ---------- load data ----------
     with open(areas_json, 'r') as f:
         data = json.load(f)
 
-    points_df = pd.read_csv(points_csv,header=None)
+    points_df = pd.read_csv(points_csv, header=None)
     results = []
+
+    # Fast lookup: annotation id → annotation dict
+    ann_by_id = {a["id"]: a for a in data["annotations"]}
 
     for img_data in data['images']:
         img_name = Path(img_data['file_name']).name
         img_path = Path(image_dir) / img_name
         img_id = img_data['id']
-        
 
         img_areas = [a for a in data['annotations'] if a['image_id'] == img_id]
-        img_points = points_df[points_df.iloc[:,3] == img_name]
+        img_points = points_df[points_df.iloc[:, 3] == img_name]
 
         for area in img_areas:
             area_id = area['id']
             coords = np.array(area['segmentation'][0]).reshape(-1, 2)
 
-
-
-            head, tail,ol_head,ol_tail = match_head_tail(coords, img_points)
+            head, tail, ol_head, ol_tail = match_head_tail(coords, img_points)
             if head is None or tail is None:
                 continue
-     
-            
-            #DEBUG FLAG: ORDER OF INDICES MIGHT BE REVERSED
-            # Prepare coordinates for storage and function call
+
             head_coords = (float(head.iloc[1]), float(head.iloc[2]))
             tail_coords = (float(tail.iloc[1]), float(tail.iloc[2]))
 
-            # Run user analysis function
-            analysis_out = analysis_func(area, head_coords, tail_coords,ol_tail, str(img_path),settings)
+            analysis_out = analysis_func(
+                area,
+                head_coords,
+                tail_coords,
+                ol_tail,
+                str(img_path),
+                settings
+            )
 
-            # Format output
+            # ---------- format analysis output ----------
             if isinstance(analysis_out, dict):
                 entry = {**analysis_out}
             elif isinstance(analysis_out, (list, np.ndarray)):
@@ -103,8 +133,6 @@ def analyze_annotations(areas_json, points_csv, image_dir,settings, analysis_fun
             else:
                 entry = {"value": analysis_out}
 
-
- 
             entry.update({
                 "area_id": area_id,
                 "image_name": img_name,
@@ -114,9 +142,35 @@ def analyze_annotations(areas_json, points_csv, image_dir,settings, analysis_fun
                 "head_y": head_coords[1],
                 "tail_x": tail_coords[0],
                 "tail_y": tail_coords[1],
-                "label_id":area["category_id"]
+                "label_id": area["category_id"]
             })
             results.append(entry)
+
+            # ---------- write center_line back as COCO keypoints ----------
+            ann = ann_by_id[area_id]
+
+            keypoints = [0, 0, 0, 0, 0, 0]  # default placeholder
+            num_keypoints = 2
+    
+            if isinstance(analysis_out, dict) and "center_line" in analysis_out:
+                cl_raw = analysis_out["center_line"]
+                cl = interpolate_centerline(cl_raw, n_points=40)
+
+                if cl is not None:
+                    keypoints = []
+                    for x, y in cl:
+                        keypoints.extend([float(x), float(y), 2])
+                    num_keypoints = 40
+                else:
+                    keypoints = [0, 0, 0, 0, 0, 0]
+                    num_keypoints = 2
+
+            ann["keypoints"] = keypoints
+            ann["num_keypoints"] = num_keypoints
+
+    # ---------- overwrite SAME json file ----------
+    with open(areas_json, "w") as f:
+        json.dump(data, f, indent=2)
 
     return pd.DataFrame(results)
 
@@ -564,6 +618,7 @@ def analyze_thickness(area, head_coords, tail_coords,ol_tail, image_path,setting
         output['percent_'+str(np.round(i,2))] = thicks[i]
     output["length"] = length
     output["area"] = area
+    output["center_line"] = centerline
     return output
 
 
