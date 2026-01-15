@@ -17,16 +17,12 @@ from networkx.exception import NetworkXNoPath
 from skimage.draw import polygon as sk_polygon
 from shapely.geometry import Polygon, Point, LineString
 from pathlib import Path
-
 from skimage import filters
-
 from scipy.signal import savgol_filter
-
 from IPython import embed
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from scipy.signal import savgol_filter
-
 from skimage.morphology import medial_axis
 from skimage.graph import route_through_array
 from scipy.spatial.distance import cdist
@@ -35,7 +31,8 @@ from classifiers import classify,angle_histogram
 import importlib.resources as r
 from scipy.spatial.distance import cdist
 from scipy.signal import savgol_filter
-
+import concurrent.futures
+from threading import Lock
 
 def interpolate_centerline(center_line, n_points=40):
     """
@@ -488,6 +485,797 @@ def find_head_tail(c, dS, bloc_int, debug=False):
 
     return head, tail
 
+def centerline_inside_polygon(centerline, polygon):
+    """
+    Check if centerline points lie inside polygon using Shapely.
+
+    Parameters
+    ----------
+    centerline : (N,2) array
+        Points along the centerline
+    polygon : (M,2) array
+        Polygon coordinates (can be concave, complex)
+
+    Returns
+    -------
+    inside_all : int
+        1 if all centerline points are inside polygon, else 0
+    inside_fraction : float
+        Fraction of centerline points inside polygon [0,1]
+    """
+    # Create Shapely polygon (automatically closed if needed)
+    poly = Polygon(polygon)
+
+    inside_flags = np.array([poly.contains(Point(pt)) for pt in centerline], dtype=bool)
+
+    inside_fraction = inside_flags.mean()
+    inside_all = int(inside_flags.all())
+
+    return inside_all, inside_fraction
+
+
+def end_curvature_ratio(centerline, frac=0.05, eps=1e-8):
+    """
+    Ratio of end curvature to global curvature.
+    Lower = smoother ends.
+    """
+    curvature = compute_curvature(centerline)
+
+    n = len(curvature)
+    k = max(1, int(np.ceil(frac * n)))
+
+    end_curv = np.concatenate([curvature[:k], curvature[-k:]])
+    mean_end = np.mean(end_curv)
+    mean_all = np.mean(curvature)
+
+    return mean_end / (mean_all + eps)
+
+
+
+def evaluate_candidate(polygon, h_idx, t_idx, backbone_func, weights,debug=False):
+    try:
+        centerline, length, area = backbone_func(
+            polygon, h_idx, t_idx,
+            window_size=5,
+            multiplier=1,
+            smooth_win=15,
+            smooth_poly=3,
+            debug=debug
+        )
+
+        if centerline is None or len(centerline) < 5:
+            return None
+
+        curvature = compute_curvature(centerline)
+        mean_bend = np.mean(curvature)
+        peak_bend = np.quantile(curvature, 1.0)
+
+        # NEW metric
+        end_curv_ratio = end_curvature_ratio(centerline, frac=0.05)
+
+        inside_all, inside_fraction = centerline_inside_polygon(
+            centerline, polygon
+        )
+
+        return {
+            "centerline": centerline,
+            "length": length,
+            "area": area,
+            "curvature": curvature,
+            "mean_smoothness": mean_bend,
+            "peak_bend": peak_bend,
+            "end_curvature_ratio": end_curv_ratio,  # ← NEW
+            "inside_all": inside_all,
+            "inside_fraction": inside_fraction,
+            "head_idx": h_idx,
+            "tail_idx": t_idx,
+        }
+
+    except Exception:
+
+        return None
+
+
+def score_candidates_scaled(cands, metric_keys, weights, min_max=None):
+    """
+    Score candidates using min-max scaling (0–1) instead of z-score.
+
+    Parameters
+    ----------
+    cands : list of dict
+        Each dict has scalar metrics.
+    metric_keys : list of str
+        Keys to consider for scoring
+    weights : dict
+        Weight per metric (must match metric_keys)
+    min_max : dict, optional
+        Precomputed min and max per metric (from Phase 1)
+        If None, compute from this candidate list.
+
+    Returns
+    -------
+    best_candidate : dict
+        Candidate with highest weighted score
+    X_scaled : ndarray
+        Min-max scaled metric matrix (n_candidates x n_metrics)
+    min_max : dict
+        {'metric1': (min, max), ...}
+    """
+    # Build metric matrix
+    X = np.zeros((len(cands), len(metric_keys)), dtype=float)
+    for i, c in enumerate(cands):
+        for j, k in enumerate(metric_keys):
+            X[i, j] = float(c[k])
+
+    # Compute min-max scaling
+    if min_max is None:
+        min_max = {}
+        X_scaled = np.zeros_like(X)
+        for j, k in enumerate(metric_keys):
+            mn = np.min(X[:, j])
+            mx = np.max(X[:, j])
+            X_scaled[:, j] = (X[:, j] - mn) / (mx - mn + 1e-8)
+            min_max[k] = (mn, mx)
+    else:
+        X_scaled = np.zeros_like(X)
+        for j, k in enumerate(metric_keys):
+            mn, mx = min_max[k]
+            X_scaled[:, j] = (X[:, j] - mn) / (mx - mn + 1e-8)
+
+    # Weighted sum of scaled metrics
+    w = np.array([weights.get(k, 0.0) for k in metric_keys])
+    
+    scores = X_scaled @ w
+
+    # Assign scores to candidates
+    for c, s, scaled in zip(cands, scores, X_scaled):
+        c["score"] = s
+        c["scaled_metrics"] = dict(zip(metric_keys, scaled))
+
+    best_idx = np.argmax(scores)
+    return cands[best_idx], X_scaled, min_max
+
+def compute_curvature(centerline, eps=1e-8):
+    """
+    Discrete curvature for a 2D polyline.
+    Returns per-point curvature magnitude.
+    """
+    cl = np.asarray(centerline)
+
+    # First derivatives
+    dx = np.gradient(cl[:, 0])
+    dy = np.gradient(cl[:, 1])
+
+    # Second derivatives
+    ddx = np.gradient(dx)
+    ddy = np.gradient(dy)
+
+    # Curvature formula
+    kappa = np.abs(dx * ddy - dy * ddx) / (dx*dx + dy*dy + eps)**1.5
+    return np.nan_to_num(kappa)
+
+def resample_backbone(backbone, n_points):
+    """
+    Resample a 2D backbone to a fixed number of points.
+
+    Parameters
+    ----------
+    backbone : (N,2) array
+        Original backbone coordinates
+    n_points : int
+        Desired number of points in resampled backbone
+
+    Returns
+    -------
+    backbone_resampled : (n_points,2) array
+        Resampled backbone
+    """
+    backbone = np.asarray(backbone)
+    N = backbone.shape[0]
+
+    # Compute cumulative arc length
+    diffs = np.diff(backbone, axis=0)
+    dists = np.linalg.norm(diffs, axis=1)
+    cumdist = np.hstack([0, np.cumsum(dists)])
+
+    # Interpolators for x and y
+    fx = interp1d(cumdist, backbone[:,0], kind='linear')
+    fy = interp1d(cumdist, backbone[:,1], kind='linear')
+
+    # New evenly spaced points along arc length
+    new_cumdist = np.linspace(0, cumdist[-1], n_points)
+    backbone_resampled = np.vstack([fx(new_cumdist), fy(new_cumdist)]).T
+
+    return backbone_resampled
+
+
+def optimize_backbone_scaled(
+    polygon,
+    backbone_func,
+    coarse_params,
+    branch_params,
+    metric_keys,
+    weights,
+    debug=True,
+    skip_phase2=False,
+    end_smoothing=None,
+    bb_size=None,
+    show_plots=False
+):
+    """
+    Hierarchical backbone optimization with optional Phase-2 skipping
+    and optional end-only Savitzky–Golay smoothing.
+    """
+
+    poly = np.asarray(polygon)
+    N = len(poly)
+    candidate_db = []
+
+    # ===============================
+    # PHASE 0 — head-tail determination
+    # ===============================
+    print("Phase 0: head-tail initialization")
+
+    h0, t0 = find_head_tail_robust(poly, win_frac=0.05, debug=show_plots)
+
+    def closest_idx(pt, poly):
+        return np.argmin(np.linalg.norm(poly - pt[None, :], axis=1))
+
+    h0_idx = closest_idx(h0, poly)
+    t0_idx = closest_idx(t0, poly)
+    
+    
+
+    res0 = evaluate_candidate(poly, h0_idx, t0_idx, backbone_func, weights,debug=show_plots)
+    if res0 is not None:
+        res0["origin"] = "phase0_headtail"
+        candidate_db.append(res0)
+
+    # ===============================
+    # PHASE 1 — coarse global mapping
+    # ===============================
+    print("Phase 1: global mapping")
+
+    sampled_heads = np.linspace(
+        0, N - 1, coarse_params[0]["num_start_points"], dtype=int
+    )
+
+    for h in sampled_heads:
+        t = (h + N // 2) % N
+        res = evaluate_candidate(poly, h, t, backbone_func, weights,debug=show_plots)
+        if res is not None:
+            candidate_db.append(res)
+
+    best, X_scaled, min_max = score_candidates_scaled(
+        candidate_db, metric_keys, weights, min_max=None
+    )
+
+    # ===============================
+    # Optional Phase-2 skipping
+    # ===============================
+    if skip_phase2 and best.get("origin") == "phase0_headtail":
+        print("Skipping Phase 2 (Phase 0 already optimal)")
+        best_final = best
+    else:
+        # ===============================
+        # PHASE 2 — fine tuning
+        # ===============================
+        print("Phase 2: fine-tune")
+
+        coarse_range = branch_params[0]["search_space"]
+        coarse_steps = branch_params[0]["end_points_each"]
+
+        best_head = best["head_idx"]
+        best_tail = best["tail_idx"]
+
+        for _ in range(coarse_steps):
+            delta_h = np.random.randint(-coarse_range, coarse_range + 1)
+            delta_t = np.random.randint(-coarse_range, coarse_range + 1)
+
+            h_new = (best_head + delta_h) % N
+            t_new = (best_tail + delta_t) % N
+
+            res = evaluate_candidate(poly, h_new, t_new, backbone_func, weights,
+                                     debug=show_plots)
+            if res is None:
+                continue
+
+            best_temp, _, _ = score_candidates_scaled(
+                [res], metric_keys, weights, min_max=min_max
+            )
+            candidate_db.append(best_temp)
+
+        best = max(candidate_db, key=lambda x: x["score"])
+        best_head = best["head_idx"]
+        best_tail = best["tail_idx"]
+
+        fine_range = branch_params[1]["search_space"]
+        fine_steps = branch_params[1]["end_points_each"]
+
+        for dt_h in np.linspace(-fine_range, fine_range, fine_steps).astype(int):
+            for dt_t in np.linspace(-fine_range, fine_range, fine_steps).astype(int):
+                h_new = (best_head + dt_h) % N
+                t_new = (best_tail + dt_t) % N
+
+                res = evaluate_candidate(poly, h_new, t_new, backbone_func, weights)
+                if res is None:
+                    continue
+
+                best_temp, _, _ = score_candidates_scaled(
+                    [res], metric_keys, weights, min_max=min_max
+                )
+                candidate_db.append(best_temp)
+
+        best_final = max(candidate_db, key=lambda x: x["score"])
+
+    # ===============================
+    # Optional end-only backbone smoothing
+    # ===============================
+    centerline = best_final["centerline"]
+
+    if end_smoothing is not None:
+        from scipy.signal import savgol_filter
+
+        frac = end_smoothing.get("frac", 0.05)
+        window = end_smoothing.get("window", 21)
+        polyorder = end_smoothing.get("polyorder", 3)
+
+        M = len(centerline)
+        k = max(2, int(frac * M))
+
+        if window % 2 == 0:
+            window += 1
+
+        cl = centerline.copy()
+
+        for d in range(2):
+            cl[:k, d] = savgol_filter(
+                cl[:k, d], window_length=window, polyorder=polyorder, mode="mirror"
+            )
+            cl[-k:, d] = savgol_filter(
+                cl[-k:, d], window_length=window, polyorder=polyorder, mode="mirror"
+            )
+
+        centerline = cl
+        
+        if bb_size is not None:
+            centerline = resample_backbone(centerline,bb_size)
+        best_final["centerline"] = centerline
+        best_final["end_smoothed"] = True
+
+    if debug:
+        fig, ax = plt.subplots()
+
+
+        ax.plot(polygon[:, 0], polygon[:, 1], "-k")
+        ax.plot(centerline[:, 0], centerline[:, 1], "-r")
+        ax.scatter(*h0, c="g", s=80, label="head")
+        ax.scatter(*t0, c="r", s=80, label="tail")
+        ax.axis("equal")
+        ax.legend()
+
+        plt.show()
+
+    # ===============================
+    # FINAL OUTPUT
+    # ===============================
+    return centerline, best_final, candidate_db, min_max
+
+
+
+
+def upsample_closed_contour(contour, N_min=100):
+    """
+    Upsample a closed polygonal contour to at least N_min points
+    using arc-length interpolation.
+
+    Parameters
+    ----------
+    contour : np.ndarray (N,2)
+        Ordered polygon vertices (may or may not be explicitly closed)
+    N_min : int
+        Minimum number of points after upsampling
+
+    Returns
+    -------
+    contour_up : np.ndarray (M+1,2)
+        Upsampled closed contour (first point repeated at end)
+    """
+
+    c = np.asarray(contour, dtype=float)
+
+    if c.shape[0] < 3:
+        raise ValueError("Contour must have at least 3 points")
+
+    # --- Ensure closed contour ---
+    if not np.allclose(c[0], c[-1]):
+        c = np.vstack([c, c[0]])
+
+    # --- Arc-length parameterization ---
+    diffs = np.diff(c, axis=0)
+    seglen = np.linalg.norm(diffs, axis=1)
+    s = np.concatenate([[0], np.cumsum(seglen)])
+    total_len = s[-1]
+
+    if total_len == 0:
+        raise ValueError("Degenerate contour with zero length")
+
+    # --- Decide target number of points ---
+    N_orig = len(c) - 1  # exclude duplicate
+    N_target = max(N_min, N_orig)
+
+    s_new = np.linspace(0, total_len, N_target + 1)
+
+    # --- Interpolation ---
+    fx = interp1d(s, c[:, 0], kind="linear")
+    fy = interp1d(s, c[:, 1], kind="linear")
+
+    x_new = fx(s_new)
+    y_new = fy(s_new)
+
+    contour_up = np.column_stack((x_new, y_new))
+
+    # --- Enforce exact closure ---
+    contour_up[-1] = contour_up[0]
+
+    return contour_up
+
+
+def smooth_polygon_gaussian(contour, sigma=2.0, closed=True):
+    """
+    Smooth a polygon by Gaussian filtering along the contour.
+
+    Parameters
+    ----------
+    contour : (N,2) ndarray
+        Ordered polygon points
+    sigma : float
+        Smoothing strength (in points)
+    closed : bool
+        Whether contour is closed
+
+    Returns
+    -------
+    smooth_contour : (N,2) ndarray
+    """
+
+    c = np.asarray(contour)
+
+    mode = "wrap" if closed else "nearest"
+
+    xs = scipy.ndimage.gaussian_filter1d(c[:, 0], sigma, mode=mode)
+    ys = scipy.ndimage.gaussian_filter1d(c[:, 1], sigma, mode=mode)
+
+    return np.column_stack((xs, ys))
+
+
+
+
+#window_size  = 5
+def trace_centerline(poly, idx_head, idx_tail, window_size=20, smooth_win=5, smooth_poly=2, multiplier=3, debug=False, padding=5, do_clip = False):
+
+
+    
+    """
+    Compute the centerline of a self-overlapping 2D tube/worm polygon using sliding paired windows.
+
+    Parameters
+    ----------
+    poly : Nx2 array
+        Ordered polygon points of the worm outline.
+    head : 2-array
+        Coordinates of the head.
+    tail : 2-array
+        Coordinates of the tail.
+    window_size : int
+        Number of consecutive points from each half used to compute local midpoint candidates.
+    smooth_win : int
+        Window size for Savitzky-Golay smoothing of the midline.
+    smooth_poly : int
+        Polynomial order for Savitzky-Golay smoothing of the midline.
+    plot : bool
+        Plot the final outline and centerline.
+    debug : bool
+        Plot the two halves in different colors for debugging.
+    padding : int
+        Pixels to pad around polygon for area calculation.
+    
+    Returns
+    -------
+    midline : Mx2 array
+        Smoothed centerline coordinates from head to tail.
+    length : float
+        Length of the centerline in pixels.
+    area : int
+        Area of the polygon in pixels.
+    """
+    def resample_fixed_n(coords, n_points):
+        """Resample a 2D polyline to exactly n_points, evenly spaced along its arc-length."""
+        coords = np.asarray(coords)
+    
+        diffs = np.diff(coords, axis=0)
+        dists = np.linalg.norm(diffs, axis=1)
+        cumdist = np.hstack([0, np.cumsum(dists)])
+    
+        fx = interp1d(cumdist, coords[:,0], kind='linear')
+        fy = interp1d(cumdist, coords[:,1], kind='linear')
+    
+        new_cumdist = np.linspace(0, cumdist[-1], n_points)
+    
+        return np.vstack([fx(new_cumdist), fy(new_cumdist)]).T
+    import numpy as np
+    from scipy.spatial.distance import cdist
+    from scipy.signal import savgol_filter
+    import matplotlib.pyplot as plt
+    from skimage.draw import polygon as sk_polygon
+
+    poly = np.asarray(poly)
+    head = poly[idx_head]
+    tail = poly[idx_tail]
+
+    # --- split polygon into two halves, both from head to tail ---
+    if idx_head < idx_tail:
+        half1 = poly[idx_head:idx_tail+1]
+        half2 = np.vstack([poly[idx_tail:], poly[:idx_head+1]])
+    else:
+        half1 = np.vstack([poly[idx_head:], poly[:idx_tail+1]])
+        half2 = poly[idx_tail:idx_head+1][::-1]
+
+    # --- ensure both halves run head -> tail ---
+    if np.linalg.norm(half1[0] - head) > np.linalg.norm(half1[-1] - head):
+        half1 = half1[::-1]
+    if np.linalg.norm(half2[0] - head) > np.linalg.norm(half2[-1] - head):
+        half2 = half2[::-1]
+
+    # --- use shorter half as template strand ---
+    if len(half1) > len(half2):
+        half1, half2 = half2, half1   # half1 = shorter strand
+    
+    # --- FORCE BOTH halves to have identical number of points ---
+    n_points = len(half1)
+    half1 = resample_fixed_n(half1, n_points)
+    half2 = resample_fixed_n(half2, n_points)
+
+    # --- compute midline with sliding window, local contralateral distance ---
+    n_half1 = len(half1)
+    n_half2 = len(half2)
+    midline_points = []
+    
+
+    if debug: 
+        fig,ax = plt.subplots()
+        for i in range(half1.shape[0]-1):
+            ax.plot(half1[i:i+1,0],half1[i:i+1,0])
+    
+    for i in range(n_half1 - window_size + 1):
+        idx1_window = np.arange(i, i + window_size)
+        # contralateral candidate indices ± window_size
+        idx2_min = max(0, i - window_size*multiplier)
+        idx2_max = min(n_half2, i + window_size + window_size*multiplier)
+        # local distance matrix
+        local_dmat = cdist(half1[idx1_window], half2[idx2_min:idx2_max])
+        idx2_local = np.argmin(local_dmat, axis=1) + idx2_min
+        # compute local midpoint
+        local_mid = (half1[idx1_window] + half2[idx2_local]) / 2.0
+        midline_points.append(local_mid[0])  # slide by 1
+
+    # append last point to ensure coverage to tail
+    midline_points.append((half1[-1] + half2[-1]) / 2.0)
+    midline = np.array(midline_points)
+
+    # --- clip to head and tail ---
+    d_start = np.linalg.norm(midline - head, axis=1)
+    d_end = np.linalg.norm(midline - tail, axis=1)
+    start_idx = np.argmin(d_start)
+    end_idx = np.argmin(d_end)
+    if start_idx < end_idx:
+        midline = midline[start_idx:end_idx+1]
+    else:
+        midline = midline[end_idx:start_idx+1][::-1]
+
+    # --- prepend head and append tail ---
+    midline = np.vstack([head, midline, tail])
+
+    # --- smooth centerline ---
+    if len(midline) >= smooth_win:
+        midline[:,0] = savgol_filter(midline[:,0], smooth_win, smooth_poly)
+        midline[:,1] = savgol_filter(midline[:,1], smooth_win, smooth_poly)
+
+
+    diffs = np.diff(midline, axis=0)
+    length = np.sum(np.linalg.norm(diffs, axis=1))
+
+    # --- compute polygon area (rasterize for simplicity) ---
+    min_xy = np.floor(poly.min(axis=0)) - padding
+    poly_shifted = poly - min_xy + padding
+    max_xy = np.ceil(poly_shifted.max(axis=0)) + padding
+    img_shape = (int(max_xy[1])+1, int(max_xy[0])+1)
+    rr, cc = sk_polygon(poly_shifted[:,1], poly_shifted[:,0], img_shape)
+    mask = np.zeros(img_shape, dtype=np.uint8)
+    mask[rr, cc] = 1
+    area = np.sum(mask)
+
+    # --- optional plot ---
+    if debug:
+        plt.figure(figsize=(8,6))
+        plt.plot(poly[:,0], poly[:,1], 'k-', label='Outline')
+       
+        plt.plot(half1[:,0], half1[:,1], 'r.-', label='Half 1 (template)')
+        plt.plot(half2[:,0], half2[:,1], 'b.-', label='Half 2')
+        plt.plot(midline[:,0], midline[:,1], 'k-', lw=2, label='Centerline')
+        plt.scatter(head[0], head[1], c='g', s=50, label='Head')
+        plt.scatter(tail[0], tail[1], c='m', s=50, label='Tail')
+        plt.axis('equal')
+        plt.legend()
+        plt.show()
+
+    return midline, length, area
+
+def find_head_tail_robust(contour, win_frac=0.05, debug=False):
+    """
+    Robust head/tail detection for worm-like polygons.
+
+    Parameters
+    ----------
+    contour : (N,2) array
+        Closed worm outline
+    dS : float
+        Polygon simplification tolerance
+    win_frac : float
+        Neighborhood size as fraction of contour length
+    debug : bool
+
+    Returns
+    -------
+    head : (2,)
+    tail : (2,)
+    """
+
+    # ---------------------------------------
+    # Simplify & extract closed contour
+    # ---------------------------------------
+    #poly = Polygon(contour).simplify(dS)
+    poly = Polygon(contour)
+    pts = np.asarray(poly.exterior.coords[:-1])
+    N = len(pts)
+
+    if N < 40:
+        raise ValueError("Contour too small for robust head/tail detection")
+
+    # ---------------------------------------
+    # Arc-length parameterization
+    # ---------------------------------------
+    dxy = np.diff(np.vstack([pts, pts[0]]), axis=0)
+    ds = np.linalg.norm(dxy, axis=1)
+    s = np.cumsum(ds)
+    s = s / s[-1]  # normalize [0,1)
+
+    # ---------------------------------------
+    # Tangents & curvature (robust, closed)
+    # ---------------------------------------
+    edges = np.diff(np.vstack([pts, pts[0]]), axis=0)     # (N,2)
+    ds = np.linalg.norm(edges, axis=1) + 1e-8             # (N,)
+    
+    angles = np.arctan2(edges[:, 1], edges[:, 0])         # (N,)
+    dtheta = np.diff(np.unwrap(np.hstack([angles, angles[0]])))  # (N,)
+    
+    curvature = np.abs(dtheta) / ds                        # (N,)
+    
+    # ---------------------------------------
+    # Smooth curvature with boundary extension
+    # ---------------------------------------
+    win = max(5, int(win_frac * N))
+    if win % 2 == 0:
+        win += 1
+    if win >= N:
+        win = N - 1 if (N - 1) % 2 else N - 2
+    
+    # extend signal by 5% to protect boundary peaks
+    ext_frac = 0.05
+    k_ext = max(3, int(ext_frac * N))
+    
+    curv_ext = np.concatenate([curvature, curvature[:k_ext]])
+    
+    curv_ext_s = scipy.signal.savgol_filter(
+        curv_ext,
+        window_length=win,
+        polyorder=2,
+        mode="interp"
+    )
+    
+    # ---------------------------------------
+    # Candidate ends = curvature peaks
+    # ---------------------------------------
+    # pks_ext, props = scipy.signal.find_peaks(
+    #     curv_ext_s,
+    #     prominence=np.percentile(curv_ext_s, 75),
+    #     distance=win
+    # )
+    pks_ext, _ = scipy.signal.find_peaks(
+    curv_ext_s,
+    distance=win
+    )
+    
+    # Fallback if too few peaks
+    if len(pks_ext) < 2:
+        # take the two largest values directly
+        pks_ext = np.argsort(curv_ext_s)[-2:]
+    else:
+        # Sort peaks by height (descending) and keep top 2
+        pks_ext = pks_ext[np.argsort(curv_ext_s[pks_ext])[-2:]]
+        
+    # map peaks back to original index range
+    pks = np.unique(pks_ext % N)
+    
+    if len(pks) < 2:
+        pks = np.argsort(curvature)[-4:]
+    
+    curvature_s = curv_ext_s[:N]  # keep only original segment
+
+    # ---------------------------------------
+    # Pick two most distant peaks
+    # ---------------------------------------
+    P = pts[pks]
+    D = np.linalg.norm(P[:, None] - P[None, :], axis=-1)
+    i, j = np.unravel_index(np.argmax(D), D.shape)
+
+    idx1, idx2 = pks[i], pks[j]
+
+    # ---------------------------------------
+    # Head vs tail decision
+    # ---------------------------------------
+    def end_score(idx):
+        """Higher = more tail-like"""
+        # local curvature
+        curv = curvature_s[idx]
+
+        # local symmetry (head more symmetric)
+        k = win // 2
+        left = curvature_s[(idx - k) % N]
+        right = curvature_s[(idx + k) % N]
+        asym = abs(left - right)
+
+        return curv + 0.5 * asym
+
+    s1 = end_score(idx1)
+    s2 = end_score(idx2)
+
+    if s1 > s2:
+        tail_idx, head_idx = idx1, idx2
+    else:
+        tail_idx, head_idx = idx2, idx1
+
+    head = pts[head_idx]
+    tail = pts[tail_idx]
+
+    # ---------------------------------------
+    # Debug visualization
+    # ---------------------------------------
+    if debug:
+        fig, ax = plt.subplots(1, 2, figsize=(10, 4))
+
+        ax[0].plot(curvature_s, lw=1)
+        ax[0].scatter(pks, curvature_s[pks], c="k")
+        ax[0].axvline(head_idx, color="g", label="head")
+        ax[0].axvline(tail_idx, color="r", label="tail")
+        ax[0].set_title("Curvature profile")
+        ax[0].legend()
+
+        ax[1].plot(pts[:, 0], pts[:, 1], "-k")
+        ax[1].scatter(*head, c="g", s=80, label="head")
+        ax[1].scatter(*tail, c="r", s=80, label="tail")
+        ax[1].axis("equal")
+        ax[1].legend()
+
+        plt.show()
+
+    return head, tail
+
+
+
+
+
+
 
 def color_deconvolution(img,basename, color_matrix, output_dir, prefix="c"):
     """
@@ -528,7 +1316,7 @@ def color_deconvolution(img,basename, color_matrix, output_dir, prefix="c"):
     separated = separated / separated.max(axis=(0,1))  # normalize 0–1
 
     # --- 6. Save results ---
-    os.makedirs(output_dir, exist_ok=True)
+   
     for i in range(3):
         #channel_img = (1 - separated[:, :, i]) * 255  # invert for better contrast
         channel_img = make_8bit_img(separated[:, :, i])
@@ -566,19 +1354,45 @@ def coco_segmentation_to_array(area):
 
 
 def get_centerline_wrapper(area_coords, head_coords, ol_tail,settings):
-    selfoverlap = check_self_overlap(area_coords)
-    
-    
+      
+    area = polygon_area_np(area_coords)
     try:
-        if selfoverlap:
-            centerline,_,area = get_worm_centerline_sliding(area_coords, head_coords, ol_tail, window_size=5, multiplier=1, smooth_win=15, smooth_poly=3, debug=settings["debug"])
+        #area_coords = area_coords.reshape(-1,2)
+        area_coords1 = upsample_closed_contour(area_coords, N_min=settings["midline_sttngs"]["n_poly"])
+        area_coords2 = smooth_polygon_gaussian(area_coords1, sigma=4.0, closed=True)
 
-        else: 
-            centerline,_,area = get_worm_centerline(area_coords, plot=False, padding=10)
+
+        output = centerline, best_candidate, candidate_db, mean_std = optimize_backbone_scaled(
+            area_coords2,
+            trace_centerline,
+            settings["midline_sttngs"]["coarse_params"],
+            settings["midline_sttngs"]["branch_params"],
+            settings["midline_sttngs"]["metric_keys"],
+            settings["midline_sttngs"]["weights"],
+            debug=settings["debug"],
+            skip_phase2=settings["midline_sttngs"]["skip_phase2"],
+            show_plots=settings["midline_sttngs"]["show_plots"],
+            end_smoothing=settings["midline_sttngs"]["end_smoothing"],
+            bb_size=settings["midline_sttngs"]["bb_size"]
+            )
+        centerline = output[0]
+     
     except:
-        centerline,area = np.nan, np.nan
+        centerline = np.nan
         
     return centerline, area
+
+
+def polygon_area_np(polygon):
+
+    x = polygon[:,0]
+    y = polygon[:,1]
+    if not np.allclose(polygon[0], polygon[-1]):
+        x = np.append(x, x[0])
+        y = np.append(y, y[0])
+    area = 0.5 * np.abs(np.dot(x[:-1], y[1:]) - np.dot(x[1:], y[:-1]))
+    return area
+
 
 def analyze_thickness(area, head_coords, tail_coords,ol_tail, image_path,settings):
 
@@ -729,7 +1543,7 @@ def analyze_image_with_annotations(image_path, annotations, color_matrix,output_
         print()
         img = awb(img,quantile=settings['AWB'][1],debug=False)
   
-        
+    os.makedirs(output_dir,exist_ok=True)    
     separated,orig_img = color_deconvolution(img,basename, color_matrix,output_dir)
   
     red_channel = make_8bit_img(separated[:,:,0])
@@ -743,17 +1557,18 @@ def analyze_image_with_annotations(image_path, annotations, color_matrix,output_
         area_id = anno['id']
         
         coords = np.array(anno['segmentation'][0]).reshape(-1, 2).astype(np.int32)
-   
-
+       
+        centerline = np.array(anno['keypoints']).reshape(-1, 3).astype(np.int32)
+        centerline = centerline[:,[0,1]]
+        
+        length = np.sqrt(np.sum(np.sum(np.square(np.diff(centerline,axis=0)),axis=1),axis=0))
         try:
             #centerline,area = get_centerline_wrapper(coords, head_coords, ol_tail)
             
-            centerline,length,area = get_worm_centerline(coords, plot=settings['debug'], padding=10)
-    
-            centerline = smooth_pts(centerline, win=31, poly=3)
-            
-            s_im=straighten(red_channel, centerline, int(length*0.15))
-            s_im_orig=straighten(orig_img, centerline, int(length*0.15))
+            #centerline,length,area = get_worm_centerline(coords, plot=settings['debug'], padding=10)
+                           
+            s_im=straighten(red_channel, centerline, int(length*0.75))
+            s_im_orig=straighten(orig_img, centerline, int(length*0.75))
 
             out_path = os.path.join(output_dir, f"red_ch_{basename}_im_{area_id}.png")
             cv2.imwrite(out_path, s_im)
@@ -777,7 +1592,88 @@ def analyze_image_with_annotations(image_path, annotations, color_matrix,output_
             })
         except:
             print("[WARNING] Tracing cernterline failed")
+            
     return results
+
+
+def analyze_image_with_annotations_threading(image_path, annotations, color_matrix, output_dir, settings):
+    """
+    Deconvolves image and measures summed intensity per annotation with multithreading.
+    """
+
+    _, basename = os.path.split(image_path)
+    basename = basename[1:-4]
+
+    # --- Load image ---
+    img = cv2.imread(image_path)
+
+    if settings['AWB'][0]:
+        img = awb(img, quantile=settings['AWB'][1], debug=False)
+    
+    
+    os.makedirs(output_dir,exist_ok=True)
+    separated, orig_img = color_deconvolution(img, basename, color_matrix, output_dir)
+
+    red_channel = make_8bit_img(separated[:, :, 0])
+    green_channel = make_8bit_img(separated[:, :, 1])
+    blue_channel = make_8bit_img(separated[:, :, 2])
+
+    h, w = red_channel.shape
+    results = []
+    result_lock = Lock()  # thread-safe append
+
+    def process_annotation(anno):
+        area_id = anno['id']
+    
+        try:
+            coords = np.array(anno['segmentation'][0]).reshape(-1, 2).astype(np.int32)
+            centerline = np.array(anno['keypoints']).reshape(-1, 3).astype(np.int32)
+            centerline = centerline[:,[0,1]]
+            
+            length = np.sqrt(np.sum(np.sum(np.square(np.diff(centerline,axis=0)),axis=1),axis=0))
+    
+            s_im = straighten(red_channel, centerline, int(length * 0.75))
+            s_im_orig = straighten(orig_img, centerline, int(length * 0.75))
+    
+            cv2.imwrite(
+                os.path.join(output_dir, f"red_ch_{basename}_im_{area_id}.png"),
+                s_im
+            )
+    
+            s_im_orig = s_im_orig[:, :, [2, 1, 0]]
+            cv2.imwrite(
+                os.path.join(output_dir, f"orig_im_{basename}_{area_id}.png"),
+                s_im_orig.astype(np.uint8)
+            )
+    
+            mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.fillPoly(mask, [coords], 1)
+            total_intensity = np.sum(red_channel[mask == 1])
+    
+            result = {
+                "area_id": area_id,
+                "intensity": total_intensity,
+                "success": True
+            }
+    
+        except Exception as e:
+            print(f"[WARNING] Tracing centerline failed for area {area_id}: {e}")
+            result = {
+                "area_id": area_id,
+                "intensity": np.nan,
+                "success": False
+            }
+    
+        with result_lock:
+            results.append(result)
+
+    # Run threads
+    max_workers = min(settings["max_workers"], len(annotations))  # adjust number of threads
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor.map(process_annotation, annotations)
+
+    return results
+
 
 
 def analyze_staining_from_json(areas_json, image_dir, color_matrix,settings, df=None,output_dir=None):
@@ -817,7 +1713,9 @@ def analyze_staining_from_json(areas_json, image_dir, color_matrix,settings, df=
         
 
         # Run analytic function
-        image_results = analyze_image_with_annotations(str(img_path), annotations, color_matrix,output_dir,settings)
+        #image_results = analyze_image_with_annotations(str(img_path), annotations, color_matrix,output_dir,settings)
+
+        image_results = analyze_image_with_annotations_threading(str(img_path), annotations, color_matrix,output_dir,settings)
 
         # Add image name to each entry
         for r in image_results:
@@ -1920,6 +2818,58 @@ def get_worm_centerline_legacy(poly, plot=False, padding=10):
 
     return centerline, length, area
 
+def normalize_backbones(backbones):
+    """
+    Translate and rotate backbones so that:
+    - first valid point is at (0, 0)
+    - last valid point lies on the x-axis
+
+    Parameters
+    ----------
+    backbones : np.ndarray (n, l, 2)
+
+    Returns
+    -------
+    normalized : np.ndarray (n, l, 2)
+    """
+
+    normalized = backbones.copy()
+
+    for i in range(backbones.shape[0]):
+        bb = backbones[i]
+
+        # Find valid points
+        valid_mask = ~np.isnan(bb[:, 0])
+        if valid_mask.sum() < 2:
+            continue  # not enough points to normalize
+
+        pts = bb[valid_mask]
+
+        p0 = pts[0]
+        p1 = pts[-1]
+
+        # Translate
+        pts_trans = pts - p0
+
+        # Rotation angle
+        dx, dy = p1 - p0
+        theta = -np.arctan2(dy, dx)
+
+        R = np.array([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta),  np.cos(theta)]
+        ])
+
+        pts_rot = pts_trans @ R.T
+
+        # Write back
+        normalized[i, valid_mask, :] = pts_rot
+
+    return normalized
+
+
+
+
 ###############################################################################
 #
 # helper functions
@@ -2002,6 +2952,95 @@ def awb(im, quantile=0.15, debug=False, base_level=224):
 # Data and string handling
 #
 ###############################################################################
+
+def polygon_area(coords):
+    """
+    Compute polygon area using the shoelace formula.
+    coords: (N,2) array
+    """
+    if coords.shape[0] < 3:
+        return np.nan
+
+    x = coords[:, 0]
+    y = coords[:, 1]
+    return 0.5 * np.abs(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+
+
+def backbone_length(coords):
+    """
+    Compute arc length of a backbone.
+    coords: (L,2) array
+    """
+    if coords.shape[0] < 2:
+        return np.nan
+
+    diffs = np.diff(coords, axis=0)
+    return np.nansum(np.linalg.norm(diffs, axis=1))
+
+
+def load_metrics_from_json(json_path):
+    """
+    Load keypoint annotations from a COCO-style JSON file and return
+    padded backbone arrays + backbone length + annotation area.
+
+    Returns
+    -------
+    ann_ids : np.ndarray (n,)
+    backbones : np.ndarray (n, l, 2)
+    backbone_lengths : np.ndarray (n,)
+    areas : np.ndarray (n,)
+    """
+
+    with open(json_path, "r") as f:
+        data = json.load(f)
+
+    ann_ids = []
+    backbone_list = []
+    backbone_lengths = []
+    areas = []
+    segs = []
+
+    for ann in data.get("annotations", []):
+        ann_id = ann.get("id", None)
+        keypoints = ann.get("keypoints", [])
+
+        # -------- backbone ----------
+        if len(keypoints) < 6:
+            coords = np.empty((0, 2))
+        else:
+            kp = np.array(keypoints, dtype=float).reshape(-1, 3)
+            coords = kp[:, :2]  # drop visibility
+
+        backbone_list.append(coords)
+        backbone_lengths.append(backbone_length(coords))
+        ann_ids.append(ann_id)
+
+        # -------- area annotation ----------
+        seg = ann.get("segmentation", [])
+        segs.append(seg)
+        if isinstance(seg, list) and len(seg) > 0:
+            poly = np.array(seg[0], dtype=float).reshape(-1, 2)
+            areas.append(polygon_area(poly))
+        else:
+            areas.append(np.nan)
+
+    # -------- pad backbones ----------
+    max_len = max(b.shape[0] for b in backbone_list)
+    n = len(backbone_list)
+
+    backbones = np.full((n, max_len, 2), np.nan, dtype=float)
+    for i, bb in enumerate(backbone_list):
+        if bb.size > 0:
+            backbones[i, :bb.shape[0], :] = bb
+
+    return (
+        np.array(ann_ids),
+        backbones,
+        segs,
+        np.array(backbone_lengths),
+        np.array(areas),
+        
+    )
 
 
 def create_group_labels(df,grps=None,arr=None):
