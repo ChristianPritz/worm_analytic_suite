@@ -6,8 +6,8 @@ Created on Thu Oct 30 16:09:51 2025
 @author: christian
 """
 import pandas as pd
-import scipy
 import numpy as np
+import os, pickle,scipy
 import matplotlib.pyplot as plt
 
 
@@ -169,6 +169,7 @@ def worm_width_plot(df_container, columns, percents, lengths, figsize=(6,1),
 
     plt.tight_layout()
     plt.show()
+    return (fig,ax)
 
 
 def instantiate_plot_props(plot_props=None):
@@ -559,10 +560,50 @@ def class_histogram(
     plt.tight_layout()
     plt.show()
     
+    return (fig,ax) 
+
+###############################################################################
+#    
+# plot handling functions     
+#
+###############################################################################    
     
+
+
+
+def save_plot(axObj,name,s_path):
+    if name is None or name  == '':
+        return 
+    if s_path is None or s_path == '':
+        return 
     
+    if not os.path.exists(s_path):
+        os.mkdir(s_path)
+        
+    fname = s_path +'/' + name + '.png'
+    pickle_name = s_path  +'/' + name + '.pickle'
+    print(fname)
+    print(pickle_name)
+        
+    if isinstance(axObj,tuple):
+        axObj[0].savefig(fname, bbox_inches='tight')
+        fig = axObj[0]
+    else:
+        axObj.savefig(fname, bbox_inches='tight')
+        fig = axObj
     
+    with open(pickle_name, 'wb') as f:
+        pickle.dump(fig, f)
     
+def load_plot(name,s_path):
+    if not os.path.exists(s_path):
+        os.mkdir(s_path)
+    pickle_name = s_path + name + '.pickle'
+    with open(pickle_name, 'rb') as f:
+        fig = pickle.load(f)
+    plt.figure(fig.number)
+    plt.show()
     
-    
+    return fig,fig.axes      
+
     

@@ -9,12 +9,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import LineString, Point, Polygon
 import pandas as pd
-import cv2
+import cv2,copy
 from measurements import collect_annotations, analyze_annotations,analyze_thickness,analyze_staining_from_json, assign_conditions,organize_dataset, create_group_labels
 from worm_plotter import worm_width_plot, df_to_grouped_array,plot_grouped_values,class_histogram
 from classifiers import  classify,run_kmeans_and_show,label_coco_areas,coco_areas_calculation,train_classifier
 from annotation_tool_v8 import AnnotationTool
-from worm_plotter import worm_width_plot, filter_dataframe,df_to_grouped_array
+from worm_plotter import *
 
 
 
@@ -29,12 +29,10 @@ from worm_plotter import worm_width_plot, filter_dataframe,df_to_grouped_array
 settings = {"rim_score_cutoff":0.05, #cut-off for worms on the image edge
             "debug":False,           #displaying the control plots 
             "use_classifier":False,  #use classifier to eliminate the worm fragments
-            "pixel_size":1.3,        #global pixel size value
+            "pixel_size":1.4571,        #global pixel size value
             "imsize":3120,
             "AWB":[True,0.05],
             "max_workers": 16}   #maxium a mount of workers in multithreading       
-
-
 
 
 # settings for midline detection 
@@ -113,13 +111,18 @@ point_csv =  '/home/christian/Documents/data/space worms/output/annotations_poin
 area_json =  '/home/christian/Documents/data/space worms/output/annotations_areas.json'
 color_csv =  '/home/christian/models/worm_analytic_suite/class_colors.csv'
 output_dir= '/home/christian/Documents/data/space worms/images/output/'
+plot_path = '/home/christian/Documents/data/space worms/images/output/plots'
+os.makedirs(plot_path,exist_ok=True)
+
 
 ## werk: 
 image_dir = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images' # this is where the images are sitting
-point_csv =  '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_points.csv'
-area_json =  '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json'
-color_csv =  '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
+point_csv = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_points.csv'
+area_json = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json'
+color_csv = '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
 output_dir= '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/'
+plot_path = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/plots'
+os.makedirs(plot_path,exist_ok=True)
 
 tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
 
@@ -139,9 +142,6 @@ tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
 ##---------------------------------------------------------------------------##
 #             A N A L Y Z E    T H E    S H A P E S
 ##---------------------------------------------------------------------------##
-
-
-
 
 df = analyze_annotations(
     areas_json=area_json,
@@ -194,10 +194,22 @@ cols = ['percent_0.05', 'percent_0.1', 'percent_0.15', 'percent_0.2',
 percents = np.arange(0.05,1,0.05)
 
 
+#-----------------------------------------------------------------------------#
+# Applying pixel size to calibrate the measurements
+#-----------------------------------------------------------------------------#
+df_backup = copy.deepcopy(df)
+for i in cols :
+    df[i] = df[i]/settings["pixel_size"] 
+df["length"] = df["length"]/settings["pixel_size"]
+df["area"] = df["area"]/settings["pixel_size"]**2
+
+
 ##---------------------------------------------------------------------------##
 #                 Plotting worm with graphs.... 
 ##---------------------------------------------------------------------------##
 group_colors = np.array([[0.95,0.24,0.08],[0.15,0.45,0.95],[0.6,0.6,0.6]])
+
+
 #0g - LH - NG)
 
 
@@ -219,135 +231,194 @@ df_LH3 = filter_dataframe(df_LH, ["generation"], [3,])
 df_list = [df_0G,df_0G]
 flips = [False,True]
 colors = group_colors[[0,0],:]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj = worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+save_plot(axObj[0],"worm_width_overall_0G",plot_path)
 
 #LH 
 df_list = [df_LH,df_LH]
 flips = [False,True]
 colors = group_colors[[1,1],:]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
-#LH 
+axObj = worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+save_plot(axObj[0],"worm_width_overall_LH",plot_path)
+
+#NG 
 df_list = [df_NG,df_NG]
 flips = [False,True]
 colors = group_colors[[2,2],:]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+save_plot(axObj[0],"worm_width_overall_NG",plot_path)
 
 #overall comparisons 
 df_list = [df_NG,df_0G]
 colors = group_colors[[2,0],:]
 flips = [False,True]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+save_plot(axObj[0],"worm_width_NG_vs_0G_scaled",plot_path)
 flips = [False,False]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+save_plot(axObj[0],"worm_width_NG_vs_0G",plot_path)
+
 
 df_list = [df_NG,df_LH]
 colors = group_colors[[2,1],:]
 flips = [False,True]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+save_plot(axObj[0],"worm_width_NG_vs_LH_scaled",plot_path)
 flips = [False,False]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+save_plot(axObj[0],"worm_width_NG_vs_LH",plot_path)
+
+
+df_list = [df_0G,df_LH]
+colors = group_colors[[2,1],:]
+flips = [False,True]
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+save_plot(axObj[0],"worm_width_0G_vs_LH_scaled",plot_path)
+flips = [False,False]
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+save_plot(axObj[0],"worm_width_0G_vs_LH",plot_path)
+
+
 
 # across generations
 #0G
 df_list = [df_0G1,df_0G2]
 colors = np.tile(np.array([[0.5,0.75]]).T,(1,3)) * group_colors[[0,0],:]
 flips = [False,True]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+save_plot(axObj[0],"worm_width_generations_0G_1_2_scaled",plot_path)
 flips = [False,False]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
-df_list = [df_0G2,df_0G1]
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+save_plot(axObj[0],"worm_width_generations_0G_1_2",plot_path)
+
+df_list = [df_0G2,df_0G3]
 colors = np.tile(np.array([[0.75,1]]).T,(1,3)) * group_colors[[0,0],:]
 flips = [False,True]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+save_plot(axObj[0],"worm_width_generations_0G_2_3_scaled",plot_path)
 flips = [False,False]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+save_plot(axObj[0],"worm_width_generations_0G_2_3",plot_path)
 
-
-#0G
+#LH
 df_list = [df_LH1,df_LH2]
 colors = np.tile(np.array([[0.5,0.75]]).T,(1,3)) * group_colors[[1,1],:]
 flips = [False,True]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
 flips = [False,False]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
-df_list = [df_LH2,df_LH1]
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+df_list = [df_LH2,df_LH3]
 colors = np.tile(np.array([[0.75,1]]).T,(1,3)) * group_colors[[1,1],:]
 flips = [False,True]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
 flips = [False,False]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
 
 
 #NG
 df_list = [df_NG1,df_NG2]
 colors = np.tile(np.array([[0.5,0.75]]).T,(1,3)) * group_colors[[2,2],:]
 flips = [False,True]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
 flips = [False,False]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
-df_list = [df_NG2,df_NG1]
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+df_list = [df_NG2,df_NG3]
 colors = np.tile(np.array([[0.75,1]]).T,(1,3)) * group_colors[[2,2],:]
 flips = [False,True]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=True)
 flips = [False,False]
-worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+axObj =worm_width_plot(df_list, cols, percents,'length', figsize=(6,1),colors=colors,flip=flips,w_ratio=1.5,scale_by_length=False)
+
+
+
+#consistency test: (checking if group order is maintained (debug))
+    
+a = np.random.random((10, 1)) + 1
+b = np.random.random((10, 1)) + 11
+c = np.random.random((10, 1)) + 21
+
+l1 = np.full((10, 1), 'a')
+l2 = np.full((10, 1), 'b')
+l3 = np.full((10, 1), 'c')
+
+data = np.vstack((a, b, c)).ravel()
+labels = np.vstack((l1, l2, l3)).ravel()
+
+test_df = pd.DataFrame({
+    "data": data,
+    "labels": labels
+})
+data,grps  = df_to_grouped_array(test_df,"labels","data")
+colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+
+
 
 
 #across_generations:-0G--------------------------------------------------------
+
 
 #STAINING INTENSITY across_generations:-NG--------------------------------------------------------
 
 df_adult = df[df["label_id"]==4]
 
-data,grps  = df_to_grouped_array(df_adult,"group_identifier","intensity")
-print(grps)
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,logY=True)
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors)
+
 
 df_LH = df_adult[df_adult["is_LH"]==1]
 data,grps  = df_to_grouped_array(df_LH,"generation","intensity")
 colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
+save_plot(axObj[0],"staining_intensity_overall_LG_log",plot_path)
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+save_plot(axObj[0],"staining_intensity_overall_LG_log",plot_path)
+
 
 df_0G = df_adult[df_adult["is_0G"]==1]
 data,grps  = df_to_grouped_array(df_0G,"generation","intensity")
 colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 df_NG = df_adult[df_adult["is_NG"]==1]
 data,grps  = df_to_grouped_array(df_NG,"generation","intensity")
 colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,logY=True)
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,logY=True)
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 # WIDTH -----------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
 df_adult = df[df["label_id"]<6]
+#df_adult = df[df["label_id"]==4]
 s=df_adult.loc[:,['percent_0.5','percent_0.55','percent_0.6', 'percent_0.65','percent_0.7','percent_0.75']]
 df_adult["width_average"] = s.mean(axis=1)
 data,grps  = df_to_grouped_array(df_adult,"group_identifier","width_average")
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
+save_plot(axObj[0],"with_overall_comparison",plot_path)
+
 
 # across_generations:-LG-------------------------------------------------------
 df_LH = df_adult[df_adult["is_NG"]==1]
 data,grps  = df_to_grouped_array(df_LH,"generation","width_average")
 colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+save_plot(axObj[0],"width_overall_NG_log",plot_path)
+
 
 # across_generations:-0G-------------------------------------------------------
 df_0G = df_adult[df_adult["is_0G"]==1]
 data,grps  = df_to_grouped_array(df_0G,"generation","width_average")
 colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+save_plot(axObj[0],"width_overall_0G_log",plot_path)
+
 
 # across_generations:-0G-------------------------------------------------------
 df_NG = df_adult[df_adult["is_NG"]==1]
 data,grps  = df_to_grouped_array(df_NG,"generation","width_average")
 colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+axObj=plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
+save_plot(axObj[0],"width_overall_NG_log",plot_path)
 
 
 
@@ -357,7 +428,9 @@ plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 df_adult = df[df["label_id"]<6]
 #df_adult = df[df["label_id"]=4]
 data,grps  = df_to_grouped_array(df_adult,"group_identifier","area")
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
+axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
+save_plot(axObj[0],"area_overall_comparison",plot_path)
+
 
 # by generations 
 df_LH = df_adult[df_adult["is_LH"]==1]
@@ -543,7 +616,6 @@ colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
 plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
 
 
-
 # Larval and life stage distributions -----------------------------------------
 #
 #------------------------------------------------------------------------------
@@ -554,18 +626,22 @@ clss = pd.read_csv(color_csv)
 #overall
 df_LH = df[df["is_LH"]==1]
 data = df_LH["label_id"]
-class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95],normalize=True)
+axObj = class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95],normalize=True)
+save_plot(axObj[0],"life_stages_LH_overall",plot_path)
 #Across generations
 for i in range(1,4):
     df_LH_x = df_LH[df_LH["generation"]==i]
     data = df_LH_x["label_id"]
-    class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95],normalize=True)
+    name = "life_stages_LH_generation_" + str(i+1)
+    axObj = class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95],normalize=True)
+    save_plot(axObj[0],name,plot_path)
 #Across trials    
 for i in range(1,4):
     df_LH_x = df_LH[df_LH["trial"]==i]
     data = df_LH_x["label_id"]
-    class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95],normalize=True)  
-    
+    name = "life_stages_LH_trial_" + str(i+1)
+    axObj = class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95],normalize=True)  
+    save_plot(axObj[0],name,plot_path)
 
 df_0G = df[df["is_0G"]==1]
 data = df_0G["label_id"]
