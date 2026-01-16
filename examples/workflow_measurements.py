@@ -446,26 +446,29 @@ for i in metrics:
             save_plot(axObj[0],name,plot_path)
 
 
-
-
-
 # Larval and life stage distributions -----------------------------------------
 #
 #------------------------------------------------------------------------------
 
 #loading the class labels
-clss = pd.read_csv(color_csv)
+clss = pd.read_csv(color_csv,header=None)
 cond_labels = ["is_0G","is_LH","is_NG"]
 conds = ["0G","LH","NG"]
 group_colors = np.array([[0.95,0.24,0.08],[0.15,0.45,0.95],[0.6,0.6,0.6]])
+display_classes =       clss.iloc[3:13,:]
+
+disp_clss = display_classes
+disp_clss = disp_clss.drop(6)
+
+
 
 for idx, container in enumerate(zip(conds,cond_labels)):
     label = container[0]
     selector = container[1]
     #overall
-    df_cond = df[df["is_LH"]==1]
+    df_cond = df[df[selector]==1]
     data = df_cond["label_id"]
-    axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True)
+    axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True,ax_labels=disp_clss)
     name = "life_stage_histogram_" + label + "overall"
     save_plot(axObj[0],name,plot_path)
 
@@ -475,7 +478,7 @@ for idx, container in enumerate(zip(conds,cond_labels)):
         df_cond_x = df_cond[df_cond["generation"]==i]
         data = df_cond_x["label_id"]
         name = "life_stages_histogram_" + label + "_generation_" + str(i+1)
-        axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True)
+        axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True,ax_labels=disp_clss)
         save_plot(axObj[0],name,plot_path)
     
     #Across trials    
@@ -483,7 +486,7 @@ for idx, container in enumerate(zip(conds,cond_labels)):
         df_cond_x = df_cond[df_cond["trial"]==i]
         data = df_cond_x["label_id"]
         name = "life_stages_histogram_" + label + "_trial_" + str(i+1)
-        axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True)  
+        axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True,ax_labels=disp_clss)  
         save_plot(axObj[0],name,plot_path)
 
 

@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import os, pickle,scipy
 import matplotlib.pyplot as plt
-
+from IPython import embed
 
 
 # def df_to_grouped_array(df: pd.DataFrame, sort_col: str, value_col: str):
@@ -479,13 +479,30 @@ def class_histogram(
     alpha=0.4,
     figsize=(6, 6),
     show_counts=False, 
-    normalize = True
+    normalize = True,
+    ax_labels = None,
     ):
 
 
     # Unique classes and counts
-    u_class, cts = np.unique(data, return_counts=True)
-    x = np.arange(len(u_class))
+    if ax_labels is not None:
+        u_class, cts = np.unique(data, return_counts=True)
+        #all classes
+        x = np.arange(len(ax_labels))
+        # mapping found classes onto the vector
+        cts2 = np.zeros_like(x)
+        
+        col = ax_labels.iloc[:,4].to_numpy()
+        lookup = dict(zip(col, range(len(col))))
+        mask = np.isin(u_class, col)
+        loc = np.vectorize(lookup.get)(u_class, -1)
+        cts2[loc] = cts
+        cts = cts2
+        u_class = col
+                             
+    else:
+        u_class, cts = np.unique(data, return_counts=True)
+        x = np.arange(len(u_class))
 
     if normalize:
         cts = cts/np.sum(cts)*100
@@ -501,7 +518,8 @@ def class_histogram(
         edgecolor="black",
         linewidth=0
     )
-
+ 
+    
     tf = np.isin(label_classes.iloc[:,4].to_numpy(),u_class)
     labels = label_classes.iloc[tf,0]
     # X-axis labels
