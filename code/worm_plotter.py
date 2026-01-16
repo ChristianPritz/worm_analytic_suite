@@ -582,8 +582,8 @@ def save_plot(axObj,name,s_path):
         
     fname = s_path +'/' + name + '.png'
     pickle_name = s_path  +'/' + name + '.pickle'
-    print(fname)
-    print(pickle_name)
+    #print(fname)
+    #print(pickle_name)
         
     if isinstance(axObj,tuple):
         axObj[0].savefig(fname, bbox_inches='tight')

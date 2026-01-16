@@ -355,265 +355,98 @@ axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 
 
-#across_generations:-0G--------------------------------------------------------
 
-
-#STAINING INTENSITY across_generations:-NG--------------------------------------------------------
-
-df_adult = df[df["label_id"]==4]
-
-
-
-df_LH = df_adult[df_adult["is_LH"]==1]
-data,grps  = df_to_grouped_array(df_LH,"generation","intensity")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
-save_plot(axObj[0],"staining_intensity_overall_LG_log",plot_path)
-axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
-save_plot(axObj[0],"staining_intensity_overall_LG_log",plot_path)
-
-
-df_0G = df_adult[df_adult["is_0G"]==1]
-data,grps  = df_to_grouped_array(df_0G,"generation","intensity")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
-axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
-
-df_NG = df_adult[df_adult["is_NG"]==1]
-data,grps  = df_to_grouped_array(df_NG,"generation","intensity")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,logY=True)
-axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
-
-# WIDTH -----------------------------------------------------------------------
+# metric plots ----------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
-df_adult = df[df["label_id"]<6]
+
+
 #df_adult = df[df["label_id"]==4]
-s=df_adult.loc[:,['percent_0.5','percent_0.55','percent_0.6', 'percent_0.65','percent_0.7','percent_0.75']]
-df_adult["width_average"] = s.mean(axis=1)
-data,grps  = df_to_grouped_array(df_adult,"group_identifier","width_average")
-axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
-save_plot(axObj[0],"with_overall_comparison",plot_path)
+s=df.loc[:,['percent_0.5','percent_0.55','percent_0.6', 'percent_0.65','percent_0.7','percent_0.75']]
+df["width_average"] = s.mean(axis=1)
 
+group_colors = np.array([[0.95,0.24,0.08],[0.15,0.45,0.95],[0.6,0.6,0.6]])
+metrics = ["area","length","intensity","width_average"]
+cond_labels = ["is_0G","is_LH","is_NG"]
+conds = ["0G","LH","NG"]
 
-# across_generations:-LG-------------------------------------------------------
-df_LH = df_adult[df_adult["is_NG"]==1]
-data,grps  = df_to_grouped_array(df_LH,"generation","width_average")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
-save_plot(axObj[0],"width_overall_NG_log",plot_path)
+for i in metrics: 
+    
+    df_adult = df[df["label_id"]<6]
+    #df_adult = df[df["label_id"]=4]
+    data,grps  = df_to_grouped_array(df_adult,"group_identifier",i)
+    axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
+    name = i + "_overall_comparison"
+    save_plot(axObj[0],name,plot_path)
+    if i == "intensity":
+        axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True)
+        name = i + "_overall_comparison_logY"
+        save_plot(axObj[0],name,plot_path)
+    
+    # COMPARISONS BETWEEN CONDITIONS
+    # by generations
+    for idx in range(1,4):
+        df_cond = df_adult[df_adult["generation"]==idx]
+        data,grps  = df_to_grouped_array(df_cond,"group_identifier",i)
+        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors)
+        name = i + "_comparison_between_groups_for_generation_" + str(idx) 
+        print(name)
+        save_plot(axObj[0],name,plot_path)
+        if i == "intensity":
+            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True)
+            name = name + "_logY"
+            save_plot(axObj[0],name,plot_path)
+        
+    # by trials
+    for idx in range(1,4):
+        df_cond = df_adult[df_adult["trial"]==idx]
+        data,grps  = df_to_grouped_array(df_cond,"group_identifier",i)
+        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors)
+        name = i + "_comparison_between_groups_for_trial_" + str(idx) 
+        print(name)
+        save_plot(axObj[0],name,plot_path)
+        if i == "intensity":
+            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True)
+            name = name + "_logY"
+            save_plot(axObj[0],name,plot_path)
+    
+    
+    # SINGLE CONDTIONS
+    # by generations 
 
-
-# across_generations:-0G-------------------------------------------------------
-df_0G = df_adult[df_adult["is_0G"]==1]
-data,grps  = df_to_grouped_array(df_0G,"generation","width_average")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
-save_plot(axObj[0],"width_overall_0G_log",plot_path)
-
-
-# across_generations:-0G-------------------------------------------------------
-df_NG = df_adult[df_adult["is_NG"]==1]
-data,grps  = df_to_grouped_array(df_NG,"generation","width_average")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-axObj=plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
-save_plot(axObj[0],"width_overall_NG_log",plot_path)
-
-
-
-# AREA---------------------------------------------------------------------
-#
-#------------------------------------------------------------------------------
-df_adult = df[df["label_id"]<6]
-#df_adult = df[df["label_id"]=4]
-data,grps  = df_to_grouped_array(df_adult,"group_identifier","area")
-axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
-save_plot(axObj[0],"area_overall_comparison",plot_path)
-
-
-# by generations 
-df_LH = df_adult[df_adult["is_LH"]==1]
-data,grps  = df_to_grouped_array(df_LH,"generation","area")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_0G = df_adult[df_adult["is_0G"]==1]
-data,grps  = df_to_grouped_array(df_0G,"generation","area")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_NG = df_adult[df_adult["is_NG"]==1]
-data,grps  = df_to_grouped_array(df_NG,"generation","area")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-
-#by trials 
-df_LH = df_adult[df_adult["is_LH"]==1]
-data,grps  = df_to_grouped_array(df_LH,"trial","area")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_0G = df_adult[df_adult["is_0G"]==1]
-data,grps  = df_to_grouped_array(df_0G,"trial","area")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_NG = df_adult[df_adult["is_NG"]==1]
-data,grps  = df_to_grouped_array(df_NG,"trial","area")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-
-
-#Across generations for each trial.....NG
-df_NGt1 = df_NG[df_NG["trial"]==1]
-data,grps  = df_to_grouped_array(df_NGt1,"generation","area")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_NGt2 = df_NG[df_NG["trial"]==2]
-data,grps  = df_to_grouped_array(df_NGt2,"generation","area")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_NGt3 = df_NG[df_NG["trial"]==3]
-data,grps  = df_to_grouped_array(df_NGt3,"generation","area")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-
-#Across generations for each trial..... LH
-df_LHt1 = df_LH[df_LH["trial"]==1]
-data,grps  = df_to_grouped_array(df_NGt1,"generation","area")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_LHt2 = df_LH[df_LH["trial"]==2]
-data,grps  = df_to_grouped_array(df_NGt2,"generation","area")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_LHt3 = df_LH[df_LH["trial"]==3]
-data,grps  = df_to_grouped_array(df_NGt3,"generation","area")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-
-#Across generations for each trial..... 0G
-df_0Gt1 = df_0G[df_0G["trial"]==1]
-data,grps  = df_to_grouped_array(df_0Gt1,"generation","area")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_0Gt2 = df_0G[df_0G["trial"]==2]
-data,grps  = df_to_grouped_array(df_0Gt2,"generation","area")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_0Gt3 = df_0G[df_0G["trial"]==3]
-data,grps  = df_to_grouped_array(df_0Gt3,"generation","area")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
+    for idx,cont in enumerate(zip(conds,cond_labels)):
+        label = cont[0]
+        selector = cont[1]
+        df_cond = df_adult[df_adult[selector]==1]
+        data,grps  = df_to_grouped_array(df_cond,"generation",i)
+        colors = np.tile(group_colors[idx,:],(3,1))
+        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
+        name = i + "_" + label + "_over_generations_single_condition" 
+        print(name)
+        save_plot(axObj[0],name,plot_path)
+        if i == "intensity":
+            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
+            name = name + "_logY"
+            save_plot(axObj[0],name,plot_path)
+     
+    # by trials
+    for idx,cont in enumerate(zip(conds,cond_labels)):
+        label = cont[0]
+        selector = cont[1]
+        df_cond = df_adult[df_adult[selector]==1]
+        data,grps  = df_to_grouped_array(df_cond,"trial",i)
+        colors = np.tile(group_colors[idx,:],(3,1))
+        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
+        name = i + "_" + label + "_over_generations_single_condition" 
+        print(name)
+        save_plot(axObj[0],name,plot_path)
+        if i == "intensity":
+            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
+            name = name + "_logY"
+            save_plot(axObj[0],name,plot_path)
 
 
 
-
-#Across generations for each trial..... 
-
-# Length-----------------------------------------------------------------------
-#
-#------------------------------------------------------------------------------
-df_adult = df[df["label_id"]<6]
-#df_adult = df[df["label_id"]=4]
-data,grps  = df_to_grouped_array(df_adult,"group_identifier","length")
-plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
-
-# by generations 
-df_LH = df_adult[df_adult["is_LH"]==1]
-data,grps  = df_to_grouped_array(df_LH,"generation","length")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_0G = df_adult[df_adult["is_0G"]==1]
-data,grps  = df_to_grouped_array(df_0G,"generation","length")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_NG = df_adult[df_adult["is_NG"]==1]
-data,grps  = df_to_grouped_array(df_NG,"generation","length")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-
-#by trials 
-df_LH = df_adult[df_adult["is_LH"]==1]
-data,grps  = df_to_grouped_array(df_LH,"trial","length")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_0G = df_adult[df_adult["is_0G"]==1]
-data,grps  = df_to_grouped_array(df_0G,"trial","length")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_NG = df_adult[df_adult["is_NG"]==1]
-data,grps  = df_to_grouped_array(df_NG,"trial","length")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-
-
-#Across generations for each trial.....NG
-df_NGt1 = df_NG[df_NG["trial"]==1]
-data,grps  = df_to_grouped_array(df_NGt1,"generation","length")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_NGt2 = df_NG[df_NG["trial"]==2]
-data,grps  = df_to_grouped_array(df_NGt2,"generation","length")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_NGt3 = df_NG[df_NG["trial"]==3]
-data,grps  = df_to_grouped_array(df_NGt3,"generation","length")
-colors = np.array([[0.6,0.6,0.6],[0.6,0.6,0.6],[0.6,0.6,0.6]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-
-#Across generations for each trial..... LH
-df_LHt1 = df_LH[df_LH["trial"]==1]
-data,grps  = df_to_grouped_array(df_NGt1,"generation","length")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_LHt2 = df_LH[df_LH["trial"]==2]
-data,grps  = df_to_grouped_array(df_NGt2,"generation","length")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_LHt3 = df_LH[df_LH["trial"]==3]
-data,grps  = df_to_grouped_array(df_NGt3,"generation","length")
-colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-
-#Across generations for each trial..... 0G
-df_0Gt1 = df_0G[df_0G["trial"]==1]
-data,grps  = df_to_grouped_array(df_0Gt1,"generation","length")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_0Gt2 = df_0G[df_0G["trial"]==2]
-data,grps  = df_to_grouped_array(df_0Gt2,"generation","length")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
-
-df_0Gt3 = df_0G[df_0G["trial"]==3]
-data,grps  = df_to_grouped_array(df_0Gt3,"generation","length")
-colors = np.array([[0.95,0.24,0.08],[0.95,0.24,0.08],[0.95,0.24,0.08]])
-plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
 
 
 # Larval and life stage distributions -----------------------------------------
@@ -622,52 +455,52 @@ plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
 
 #loading the class labels
 clss = pd.read_csv(color_csv)
+cond_labels = ["is_0G","is_LH","is_NG"]
+conds = ["0G","LH","NG"]
+group_colors = np.array([[0.95,0.24,0.08],[0.15,0.45,0.95],[0.6,0.6,0.6]])
 
-#overall
-df_LH = df[df["is_LH"]==1]
-data = df_LH["label_id"]
-axObj = class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95],normalize=True)
-save_plot(axObj[0],"life_stages_LH_overall",plot_path)
-#Across generations
-for i in range(1,4):
-    df_LH_x = df_LH[df_LH["generation"]==i]
-    data = df_LH_x["label_id"]
-    name = "life_stages_LH_generation_" + str(i+1)
-    axObj = class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95],normalize=True)
-    save_plot(axObj[0],name,plot_path)
-#Across trials    
-for i in range(1,4):
-    df_LH_x = df_LH[df_LH["trial"]==i]
-    data = df_LH_x["label_id"]
-    name = "life_stages_LH_trial_" + str(i+1)
-    axObj = class_histogram(data,clss,show_counts=True,color = [0.15,0.45,0.95],normalize=True)  
+for idx, container in enumerate(zip(conds,cond_labels)):
+    label = container[0]
+    selector = container[1]
+    #overall
+    df_cond = df[df["is_LH"]==1]
+    data = df_cond["label_id"]
+    axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True)
+    name = "life_stage_histogram_" + label + "overall"
     save_plot(axObj[0],name,plot_path)
 
-df_0G = df[df["is_0G"]==1]
-data = df_0G["label_id"]
-class_histogram(data,clss,show_counts=True,color = [0.95,0.24,0.08],normalize=True)
-#Across generations
-for i in range(1,4):
-    df_0G_x = df_0G[df_0G["generation"]==i]
-    data = df_0G_x["label_id"]
-    class_histogram(data,clss,show_counts=True,color = [0.95,0.24,0.08],normalize=True)
-#Across trials    
-for i in range(1,4):
-    df_0G_x = df_0G[df_0G["trial"]==i]
-    data = df_0G_x["label_id"]
-    class_histogram(data,clss,show_counts=True,color = [0.95,0.24,0.08],normalize=True)    
-    
 
-df_NG = df[df["is_NG"]==1]
-data = df_NG["label_id"]
-class_histogram(data,clss,show_counts=True,color = [0.6,0.6,0.6],normalize=True)
-for i in range(1,4):
-    df_NG_x = df_NG[df_NG["generation"]==i]
-    data = df_NG_x["label_id"]
-    class_histogram(data,clss,show_counts=True,color = [0.6,0.6,0.6],normalize=True)
-#Across trials    
-for i in range(1,4):
-    df_NG_x = df_NG[df_NG["trial"]==i]
-    data = df_NG_x["label_id"]
-    class_histogram(data,clss,show_counts=True,color = [0.6,0.6,0.6],normalize=True)    
+    #Across generations
+    for i in range(1,4):
+        df_cond_x = df_cond[df_cond["generation"]==i]
+        data = df_cond_x["label_id"]
+        name = "life_stages_histogram_" + label + "_generation_" + str(i+1)
+        axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True)
+        save_plot(axObj[0],name,plot_path)
     
+    #Across trials    
+    for i in range(1,4):
+        df_cond_x = df_cond[df_cond["trial"]==i]
+        data = df_cond_x["label_id"]
+        name = "life_stages_histogram_" + label + "_trial_" + str(i+1)
+        axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True)  
+        save_plot(axObj[0],name,plot_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
