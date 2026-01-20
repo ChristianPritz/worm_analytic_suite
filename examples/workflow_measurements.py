@@ -121,7 +121,7 @@ area_json = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze
 color_csv = '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
 output_dir= '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/'
 plot_path = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/plots'
-save_path = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/df.csv'
+save_path = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/test.csv'
 
 os.makedirs(plot_path,exist_ok=True)
 
@@ -186,13 +186,6 @@ df = create_group_labels(df)
 
 
 
-cols = ['percent_0.05', 'percent_0.1', 'percent_0.15', 'percent_0.2',
-       'percent_0.25', 'percent_0.3', 'percent_0.35', 'percent_0.4',
-       'percent_0.45', 'percent_0.5', 'percent_0.55', 'percent_0.6',
-       'percent_0.65', 'percent_0.7', 'percent_0.75', 'percent_0.8',
-       'percent_0.85', 'percent_0.9', 'percent_0.95',]
-
-percents = np.arange(0.05,1,0.05)
 
 
 #-----------------------------------------------------------------------------#
@@ -211,9 +204,15 @@ df["area"] = df["area"]/settings["pixel_size"]**2
 # 
 #-----------------------------------------------------------------------------#
 
-df.to_csv(save_path)
-# df = pd.read_rsv(save_path)
+#df.to_csv(save_path)
+df = pd.read_csv(save_path)
+cols = ['percent_0.05', 'percent_0.1', 'percent_0.15', 'percent_0.2',
+       'percent_0.25', 'percent_0.3', 'percent_0.35', 'percent_0.4',
+       'percent_0.45', 'percent_0.5', 'percent_0.55', 'percent_0.6',
+       'percent_0.65', 'percent_0.7', 'percent_0.75', 'percent_0.8',
+       'percent_0.85', 'percent_0.9', 'percent_0.95',]
 
+percents = np.arange(0.05,1,0.05)
 
 
 ##---------------------------------------------------------------------------##
@@ -221,10 +220,7 @@ df.to_csv(save_path)
 ##---------------------------------------------------------------------------##
 group_colors = np.array([[0.95,0.24,0.08],[0.15,0.45,0.95],[0.6,0.6,0.6]])
 
-
 #0g - LH - NG)
-
-
 # worm width plot------------------------------------------------------------##
 df_NG = filter_dataframe(df, ["is_NG","generation","label_id"], [1,[1,2,3],[4]])
 df_0G = filter_dataframe(df, ["is_0G","generation","label_id"], [1,[1,2,3],[4]])
@@ -381,17 +377,21 @@ group_colors = np.array([[0.95,0.24,0.08],[0.15,0.45,0.95],[0.6,0.6,0.6]])
 metrics = ["area","length","intensity","width_average"]
 cond_labels = ["is_0G","is_LH","is_NG"]
 conds = ["0G","LH","NG"]
+props = [{"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Area (µm2)'}, #area
+         {"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Length (µm)'}, #length
+         {"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Intensity (a.u.)'}, #intensity
+         {"ylim":[80,160],"xlim":"AUTO","xlabel":'',"ylabel":'Width (µm)'},]#width_average
 
-for i in metrics: 
-    
+for mDx,i in enumerate(metrics): 
+    prop = props[mDx]
     df_adult = df[df["label_id"]<6]
     #df_adult = df[df["label_id"]=4]
     data,grps  = df_to_grouped_array(df_adult,"group_identifier",i)
-    axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors)
+    axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
     name = i + "_overall_comparison"
     save_plot(axObj[0],name,plot_path)
     if i == "intensity":
-        axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True)
+        axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True,plot_props=prop)
         name = i + "_overall_comparison_logY"
         save_plot(axObj[0],name,plot_path)
     
@@ -400,12 +400,12 @@ for i in metrics:
     for idx in range(1,4):
         df_cond = df_adult[df_adult["generation"]==idx]
         data,grps  = df_to_grouped_array(df_cond,"group_identifier",i)
-        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors)
+        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
         name = i + "_comparison_between_groups_for_generation_" + str(idx) 
         print(name)
         save_plot(axObj[0],name,plot_path)
         if i == "intensity":
-            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True)
+            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True,plot_props=prop)
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
         
@@ -413,12 +413,12 @@ for i in metrics:
     for idx in range(1,4):
         df_cond = df_adult[df_adult["trial"]==idx]
         data,grps  = df_to_grouped_array(df_cond,"group_identifier",i)
-        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors)
+        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
         name = i + "_comparison_between_groups_for_trial_" + str(idx) 
         print(name)
         save_plot(axObj[0],name,plot_path)
         if i == "intensity":
-            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True)
+            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True,plot_props=prop)
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
     
@@ -432,12 +432,12 @@ for i in metrics:
         df_cond = df_adult[df_adult[selector]==1]
         data,grps  = df_to_grouped_array(df_cond,"generation",i)
         colors = np.tile(group_colors[idx,:],(3,1))
-        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
+        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,plot_props=prop)
         name = i + "_" + label + "_over_generations_single_condition" 
         print(name)
         save_plot(axObj[0],name,plot_path)
         if i == "intensity":
-            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
+            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True,plot_props=prop)
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
      
@@ -448,12 +448,12 @@ for i in metrics:
         df_cond = df_adult[df_adult[selector]==1]
         data,grps  = df_to_grouped_array(df_cond,"trial",i)
         colors = np.tile(group_colors[idx,:],(3,1))
-        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors)
+        axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,plot_props=prop)
         name = i + "_" + label + "_over_generations_single_condition" 
         print(name)
         save_plot(axObj[0],name,plot_path)
         if i == "intensity":
-            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True)
+            axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True,plot_props=prop)
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
 
