@@ -16,8 +16,6 @@ from classifiers import  classify,run_kmeans_and_show,label_coco_areas,coco_area
 from annotation_tool_v8 import AnnotationTool
 from worm_plotter import *
 
-
-
 ##---------------------------------------------------------------------------##
 #
 #                               S E T T I N G S
@@ -112,6 +110,7 @@ area_json =  '/home/christian/Documents/data/space worms/output/annotations_area
 color_csv =  '/home/christian/models/worm_analytic_suite/class_colors.csv'
 output_dir= '/home/christian/Documents/data/space worms/images/output/'
 plot_path = '/home/christian/Documents/data/space worms/images/output/plots'
+save_path = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/df.csv'
 os.makedirs(plot_path,exist_ok=True)
 
 
@@ -122,6 +121,8 @@ area_json = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze
 color_csv = '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
 output_dir= '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/'
 plot_path = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/plots'
+save_path = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/df.csv'
+
 os.makedirs(plot_path,exist_ok=True)
 
 tool = AnnotationTool(image_dir,point_csv,area_json,color_csv)
@@ -202,6 +203,17 @@ for i in cols :
     df[i] = df[i]/settings["pixel_size"] 
 df["length"] = df["length"]/settings["pixel_size"]
 df["area"] = df["area"]/settings["pixel_size"]**2
+
+
+#-----------------------------------------------------------------------------#
+#
+#' SAVE/LOAD  THE DATAFRAME
+# 
+#-----------------------------------------------------------------------------#
+
+df.to_csv(save_path)
+# df = pd.read_rsv(save_path)
+
 
 
 ##---------------------------------------------------------------------------##
