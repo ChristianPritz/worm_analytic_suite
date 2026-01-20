@@ -384,7 +384,7 @@ props = [{"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Area (µm2)'}, #area
 
 for mDx,i in enumerate(metrics): 
     prop = props[mDx]
-    df_adult = df[df["label_id"]<6]
+    df_adult = df[df["label_id"]==4]
     #df_adult = df[df["label_id"]=4]
     data,grps  = df_to_grouped_array(df_adult,"group_identifier",i)
     axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
