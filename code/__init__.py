@@ -17,6 +17,7 @@ Modules:
 - measurements.py
 - paw_statistics.py
 - worm_plotter.py
+- CZViewer_v7.py
 """
 
 __version__ = "1.0.0"
@@ -25,5 +26,6 @@ from .classifiers import *
 from .measurements import *
 from .worm_plotter import *
 from .annotation_tool_v8 import *
+from .CZViewer_v7 import *
 
 __all__ = []
