@@ -3045,6 +3045,18 @@ def load_metrics_from_json(json_path):
 
 def create_group_labels(df,grps=None,arr=None):
     if grps is None:
+        grps = {0:"NG",1:"LH",2:"0G",3:"P0"}
+    if arr is None:
+        arr = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
+    df["group_identifier"] = "test"
+    for i in range(len(df)):
+        query = df.iloc[i][['is_NG', 'is_LH', 'is_0G','is_P0']].to_numpy().astype(np.int64)
+        idx = np.where(np.all(arr == query, axis=1))[0]
+        df.loc[df.index[i], "group_identifier"] = grps[idx[0]]
+    return df
+
+def create_group_labels_old(df,grps=None,arr=None):
+    if grps is None:
         grps = {0:"NG",1:"LH",2:"0G"}
     if arr is None:
         arr = np.array([[1,0,0],[0,1,0],[0,0,1]])
@@ -3055,28 +3067,60 @@ def create_group_labels(df,grps=None,arr=None):
         df.loc[df.index[i], "group_identifier"] = grps[idx[0]]
     return df
 
+def create_group_labels_controls(df,grps=None,arr=None):
+    if grps is None:
+        grps = {0:"HS_con",1:"HS_treat",2:"ST_con",3:"ST_treat"}
+    if arr is None:
+        arr = np.array([[1,0,1,0],[1,0,0,1],[0,1,1,0],[0,1,0,1]])
+    df["group_identifier"] = "test"
+    for i in range(len(df)):
+        query = df.iloc[i][['is_heatshock', 'is_starved', 'is_control','is_treated']].to_numpy().astype(np.int64)
+        idx = np.where(np.all(arr == query, axis=1))[0]
+        df.loc[df.index[i], "group_identifier"] = grps[idx[0]]
+    return df
+
+
 def check_cond(istr):
-    marker = [0,0,0,0,0]
+    marker = [0,0,0,0,0,0]
     if '_NG' in istr:
-        marker[0] = 1
-    if '_LH'  in istr:
         marker[1] = 1
-    if '_0G'  in istr:
+    if '_LH'  in istr:
         marker[2] = 1
+    if '_0G'  in istr:
+        marker[3] = 1
     
     
     if '_G' in istr:
-        marker[3] = int(istr[6])
+        marker[4] = int(istr[6])
         
     if '_T' in istr:
-        marker[4] = int(istr[9])
+        marker[5] = int(istr[9])
         
-    out ={'is_NG':marker[0],'is_LH':marker[1],'is_0G':marker[2],
-          'generation':marker[3],'trial':marker[4]}
+    out ={'is_P0':marker[0],'is_NG':marker[1],'is_LH':marker[2],'is_0G':marker[3],
+          'generation':marker[4],'trial':marker[5]}
     
     return out
 
-def assign_conditions(df,col_name = "image_name"):
+def check_cond_controls(istr):
+    marker = [0,0,0,0]
+    if '_HS' in istr:
+        marker[0] = 1
+    if '_STARVED'  in istr:
+        marker[1] = 1
+    
+    
+    if '_CON' in istr:
+        marker[3] = int(istr[6])
+        
+    if '_TREATED' in istr:
+        marker[4] = int(istr[9])
+        
+    out ={'is_heatshock':marker[0],'is_starved':marker[1],'is_control':marker[2],
+          'is_treated':marker[3]}
+    return out
+
+
+def assign_conditions(df,col_name = "image_name",naming_func=check_cond):
     """
     Applies `check_cond` to every value in df[col_name],
     returns a dict: {original_value: result},
@@ -3085,7 +3129,7 @@ def assign_conditions(df,col_name = "image_name"):
     # compute outputs for each row and build dict
     
     for idx, value in enumerate(df[col_name]):
-        m_dict = check_cond(value[0:10])
+        m_dict = naming_func(value[0:10])
         print(value[0:10], m_dict)
     
         for key, val in m_dict.items():
