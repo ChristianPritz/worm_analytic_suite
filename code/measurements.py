@@ -3110,17 +3110,17 @@ def check_cond_controls(istr):
     
     
     if '_CON' in istr:
-        marker[3] = int(istr[6])
+        marker[2] = 1
         
     if '_TREATED' in istr:
-        marker[4] = int(istr[9])
+        marker[3] = 1
         
     out ={'is_heatshock':marker[0],'is_starved':marker[1],'is_control':marker[2],
           'is_treated':marker[3]}
     return out
 
 
-def assign_conditions(df,col_name = "image_name",naming_func=check_cond):
+def assign_conditions(df,col_name = "image_name",naming_func=check_cond,bin_size=10):
     """
     Applies `check_cond` to every value in df[col_name],
     returns a dict: {original_value: result},
@@ -3129,8 +3129,8 @@ def assign_conditions(df,col_name = "image_name",naming_func=check_cond):
     # compute outputs for each row and build dict
     
     for idx, value in enumerate(df[col_name]):
-        m_dict = naming_func(value[0:10])
-        print(value[0:10], m_dict)
+        m_dict = naming_func(value[0:bin_size])
+        print(value[0:bin_size], m_dict)
     
         for key, val in m_dict.items():
             df.loc[idx, key] = val
