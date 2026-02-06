@@ -262,9 +262,6 @@ save_plot(axObj[0],"worm_width_starved",plot_path)
 
 
 
-
-
-
 # metric plots ----------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
@@ -284,9 +281,6 @@ props = [{"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Area (µm2)'}, #area
          {"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Length (µm)'}, #length
          {"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Intensity (a.u.)'}, #intensity
          {"ylim":[30,120],"xlim":"AUTO","xlabel":'',"ylabel":'Width (µm)'},]#width_average
-
-
-
 
 df_starve = filter_dataframe(df, ["is_starved","label_id"], [1,[4]])
 for mDx,i in enumerate(metrics): 
@@ -316,16 +310,18 @@ for mDx,i in enumerate(metrics):
 
     
 
+l_path = "/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/plots/"
+
+fig,ax = load_plot("area_0G_over_generations_single_condition",l_path)
+
+add_mean_std_lines(fig, ax, 120000, 5000,["area_0G_over_generations_single_condition",l_path])
 
 
 
+name1 = "life_stage_histogram_NGoverall"
+name2 = "life_stage_histogram_0Goverall"
 
-
-
-
-
-
-
+merge_pickled_barplots_over_ax1(name1, name2, l_path)
 
 
 

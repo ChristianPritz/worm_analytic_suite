@@ -10,7 +10,8 @@ import numpy as np
 import os, pickle,scipy
 import matplotlib.pyplot as plt
 from IPython import embed
-
+from IPython.display import display
+from matplotlib.patches import Rectangle
 
 # def df_to_grouped_array(df: pd.DataFrame, sort_col: str, value_col: str):
 #     # Group by sort_col and extract lists of value_col
@@ -585,9 +586,43 @@ def class_histogram(
 # plot handling functions     
 #
 ###############################################################################    
+def add_mean_std_lines(fig, axes, mean, std,save=None):
+    """
+    Adds three horizontal lines to an existing matplotlib figure
+    and shows the figure.
+    """
+
+    # Make this figure the active one
+    plt.figure(fig.number)
+
+    # Ensure axes is iterable
+    if not isinstance(axes, (list, tuple)):
+        axes = [axes]
+
+    for ax in axes:
+        # Preserve limits
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+
+        # Add lines
+        ax.axhline(mean, color='black', linestyle='-', linewidth=2, zorder=10)
+        ax.axhline(mean + std, color='black', linestyle='--', linewidth=1, zorder=10)
+        ax.axhline(mean - std, color='black', linestyle='--', linewidth=1, zorder=10)
+
+        # Restore limits (avoid autoscale changes)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+
+    # Redraw and show
+    fig.canvas.draw()
+    plt.show()
     
-
-
+    if save is None:
+        display(fig)
+    else: 
+        save_plot(fig,save[0],save[1])
+        
+    
 
 def save_plot(axObj,name,s_path):
     if name is None or name  == '':
@@ -624,4 +659,50 @@ def load_plot(name,s_path):
     
     return fig,fig.axes      
 
+
+def merge_pickled_barplots_over_ax1(name1, name2, s_path,save=None):
+    """
+    Load two pickled bar plots and draw all bars from plot2 onto plot1's axes.
+    Returns fig1 and its axes.
+    """
+    # ---------- load figures ----------
+    with open(os.path.join(s_path, name1 + '.pickle'), 'rb') as f:
+        fig1 = pickle.load(f)
+    with open(os.path.join(s_path, name2 + '.pickle'), 'rb') as f:
+        fig2 = pickle.load(f)
+
+    ax1 = fig1.axes[0]
+    ax2 = fig2.axes[0]
+
+    # ---------- collect bars ----------
+    def get_bars(ax):
+        return [p for p in ax.patches
+                if isinstance(p, Rectangle) and p.get_width() > 0 and p.get_height() != 0]
+
+    bars2 = get_bars(ax2)
+
+    # ---------- draw bars from fig2 onto fig1 axes ----------
+    for b in bars2:
+        rect = Rectangle(
+            b.get_xy(),
+            b.get_width(),
+            b.get_height(),
+            facecolor=b.get_facecolor(),
+            edgecolor=b.get_edgecolor(),
+            linewidth=b.get_linewidth(),
+            alpha=b.get_alpha(),
+            transform=ax1.transData  # align with ax1 coordinates
+        )
+        ax1.add_patch(rect)
+
+    # ---------- redraw figure ----------
+    fig1.canvas.draw_idle()
+    fig1.canvas.draw()
+    plt.show()
     
+    if save is None:
+        display(fig1)
+    else: 
+        save_plot(fig1,save[0],save[1])
+    
+    return fig1, ax1
