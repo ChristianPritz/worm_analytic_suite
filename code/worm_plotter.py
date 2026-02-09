@@ -581,6 +581,121 @@ def class_histogram(
     
     return (fig,ax) 
 
+import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
+def plot_pcs(scores: np.ndarray,
+             pc_x: int,
+             pc_y: int,
+             labels: np.ndarray,
+             colors: np.ndarray):
+
+    #pc_x -= 1
+    #pc_y -= 1
+
+    unique_labels = np.unique(labels)
+    label_to_color = {lab: colors[i] for i, lab in enumerate(unique_labels)}
+
+    fig, ax = plt.subplots(figsize=(6, 6), dpi=300)
+
+    from matplotlib.colors import to_rgba
+
+    for lab in unique_labels:
+        idx = labels == lab
+
+        face = to_rgba(label_to_color[lab], alpha=0.35)
+
+        ax.scatter(
+            scores[idx, pc_x],
+            scores[idx, pc_y],
+            label=str(lab),
+            facecolors=face,      # ONLY this controls fill
+            edgecolors='k',       # crisp black edge
+            s=70,
+            linewidth=1.5
+        )
+
+    # ----- cosmetics that make PCA plots look pro -----
+    ax.set_xlabel(f"PC{pc_x+1}", fontsize=12)
+    ax.set_ylabel(f"PC{pc_y+1}", fontsize=12)
+    ax.set_title(f"PCA Scatter: PC{pc_x+1} vs PC{pc_y+1}", fontsize=13)
+
+    ax.legend(frameon=False)
+    #ax.set_aspect('equal', adjustable='box')
+
+    # grid that doesn't scream
+    ax.grid(True, linewidth=0.6, alpha=0.3)
+
+    # nicer ticks
+    ax.tick_params(width=1.2, length=5)
+
+    for spine in ax.spines.values():
+        spine.set_linewidth(1.2)
+    
+    for spine in ax.spines.values():
+        spine.set_linewidth(2.5)
+
+    ax.tick_params(axis='both', labelsize=14, width=2.2, length=8)
+    
+    ax.xaxis.label.set_size(16)
+    ax.yaxis.label.set_size(16)
+
+    plt.tight_layout()
+    plt.show()
+
+    return fig, ax
+
+def run_pca(df: pd.DataFrame, columns: list):
+    """
+    Perform PCA on selected dataframe columns with NaN handling.
+
+    Rows containing NaN in the selected columns are excluded.
+
+    Returns
+    -------
+    scores : np.ndarray
+    loadings : np.ndarray
+    pca : PCA object
+    kept_indices : original dataframe indices kept for PCA
+    excluded_indices : original dataframe indices removed due to NaN
+    """
+
+    # ---------- select data ----------
+    X = df[columns]
+
+    # ---------- detect NaNs row-wise ----------
+    mask_valid = ~X.isna().any(axis=1)
+
+    kept_indices = df.index[mask_valid].to_numpy()
+    excluded_indices = df.index[~mask_valid].to_numpy()
+
+    X_clean = X.loc[mask_valid].values
+
+    # ---------- standardize ----------
+    X_scaled = StandardScaler().fit_transform(X_clean)
+
+    # ---------- PCA ----------
+    pca = PCA()
+    scores = pca.fit_transform(X_scaled)
+    loadings = pca.components_.T
+
+    # ---------- Plot explained variance ----------
+    fig, ax = plt.subplots(figsize=(7, 5))
+    var = pca.explained_variance_ratio_
+
+    ax.plot(np.arange(1, len(var) + 1), var * 100, marker='o')
+    ax.set_xlabel("Principal Component")
+    ax.set_ylabel("Explained Variance (%)")
+    ax.set_title("PCA – Explained Variance")
+    #ax.grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+    return scores, loadings, pca, kept_indices, excluded_indices
+
+
 ###############################################################################
 #    
 # plot handling functions     

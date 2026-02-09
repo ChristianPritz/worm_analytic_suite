@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from shapely.geometry import LineString, Point, Polygon
 import pandas as pd
 import cv2,copy
-from measurements import collect_annotations, analyze_annotations,analyze_thickness,analyze_staining_from_json, assign_conditions,organize_dataset, create_group_labels
+from measurements import *
 from worm_plotter import worm_width_plot, df_to_grouped_array,plot_grouped_values,class_histogram
 from classifiers import  classify,run_kmeans_and_show,label_coco_areas,coco_areas_calculation,train_classifier
 from annotation_tool_v8 import AnnotationTool
@@ -64,7 +64,6 @@ settings["midline_sttngs"] = {"n_poly":400, # the size of the worm shape polygon
     }
 
 
-
 ##---------------------------------------------------------------------------##
 #              M E R G E    T H E    A N N O T A T I O N S
 #
@@ -115,13 +114,13 @@ os.makedirs(plot_path,exist_ok=True)
 
 
 ## werk: 
-image_dir = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images' # this is where the images are sitting
-point_csv = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_points.csv'
-area_json = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/annotations_areas.json'
+image_dir = '/media/my_device/space worms/worm_profiler_sw/images' # this is where the images are sitting
+point_csv = '/media/my_device/space worms/worm_profiler_sw/output/annotations_points.csv'
+area_json = '/media/my_device/space worms/worm_profiler_sw/output/annotations_areas.json'
 color_csv = '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
-output_dir= '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/'
-plot_path = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/plots'
-save_path = '/media/my_device/space worms/makesenseai_analyzed_images/to analyze/output/test.csv'
+output_dir= '/media/my_device/space worms/worm_profiler_sw/images/output/'
+plot_path = '/media/my_device/space worms/worm_profiler_sw/images/plots'
+save_path = '/media/my_device/space worms/worm_profiler_sw/output/df.csv'
 
 os.makedirs(plot_path,exist_ok=True)
 
@@ -380,7 +379,9 @@ conds = ["0G","LH","NG"]
 props = [{"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Area (µm2)'}, #area
          {"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Length (µm)'}, #length
          {"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Intensity (a.u.)'}, #intensity
-         {"ylim":[80,160],"xlim":"AUTO","xlabel":'',"ylabel":'Width (µm)'},]#width_average
+         {"ylim":[0,160],"xlim":"AUTO","xlabel":'',"ylabel":'Width (µm)'},]#width_average
+use_CI = True
+CI = 0.90
 
 for mDx,i in enumerate(metrics): 
     prop = props[mDx]
@@ -400,6 +401,8 @@ for mDx,i in enumerate(metrics):
     for idx in range(1,4):
         df_cond = df_adult[df_adult["generation"]==idx]
         data,grps  = df_to_grouped_array(df_cond,"group_identifier",i)
+        if use_CI:
+            data = mask_outside_ci(data, ci=CI)
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
         name = i + "_comparison_between_groups_for_generation_" + str(idx) 
         print(name)
@@ -413,6 +416,8 @@ for mDx,i in enumerate(metrics):
     for idx in range(1,4):
         df_cond = df_adult[df_adult["trial"]==idx]
         data,grps  = df_to_grouped_array(df_cond,"group_identifier",i)
+        if use_CI:
+            data = mask_outside_ci(data, ci=CI)
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
         name = i + "_comparison_between_groups_for_trial_" + str(idx) 
         print(name)
@@ -431,6 +436,8 @@ for mDx,i in enumerate(metrics):
         selector = cont[1]
         df_cond = df_adult[df_adult[selector]==1]
         data,grps  = df_to_grouped_array(df_cond,"generation",i)
+        if use_CI:
+            data = mask_outside_ci(data, ci=CI)
         colors = np.tile(group_colors[idx,:],(3,1))
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,plot_props=prop)
         name = i + "_" + label + "_over_generations_single_condition" 
@@ -447,6 +454,8 @@ for mDx,i in enumerate(metrics):
         selector = cont[1]
         df_cond = df_adult[df_adult[selector]==1]
         data,grps  = df_to_grouped_array(df_cond,"trial",i)
+        if use_CI:
+            data = mask_outside_ci(data, ci=CI)
         colors = np.tile(group_colors[idx,:],(3,1))
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,plot_props=prop)
         name = i + "_" + label + "_over_generations_single_condition" 
@@ -456,6 +465,53 @@ for mDx,i in enumerate(metrics):
             axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True,plot_props=prop)
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
+
+
+#RUN A PCA over all the data
+
+
+
+columns = [ 'percent_0.05', 'percent_0.1', 'percent_0.15',
+       'percent_0.2', 'percent_0.25', 'percent_0.3', 'percent_0.35',
+       'percent_0.4', 'percent_0.45', 'percent_0.5', 'percent_0.55',
+       'percent_0.6', 'percent_0.65', 'percent_0.7', 'percent_0.75',
+       'percent_0.8', 'percent_0.85', 'percent_0.9', 'percent_0.95', 'length',
+       'area', 'intensity']
+
+
+df_adult = filter_dataframe(df, ["label_id"], [[4,5,6,7,8,9]])
+
+X,L,a,selected,killed = run_pca(df_adult, columns)
+
+
+
+labels = copy.copy(df_adult.group_identifier)
+ 
+fig,ax = plot_pcs(X,0,1,labels.drop(killed),group_colors)
+fig,ax = plot_pcs(X,2,3,labels.drop(killed),group_colors)
+fig,ax = plot_pcs(X,4,5,labels.drop(killed),group_colors)
+fig,ax = plot_pcs(X,6,7,labels.drop(killed),group_colors)
+fig,ax = plot_pcs(X,8,9,labels.drop(killed),group_colors)
+
+dim = np.array([[1,1,1],[0.6,0.6,0.6],[0.3,0.3,0.3]])
+# plots per generation per cond. 
+lab2 = copy.copy(df_adult.generation) 
+for idx,i in enumerate(conds):
+    sel_labels = labels[selected]
+    corrIdx = sel_labels == i  
+    
+    X_sel = X[corrIdx,:]
+    lab3 = lab2.drop(killed)
+    lab2_sel = lab3[corrIdx]
+    color = np.tile(group_colors[idx,:],[3,1])
+    color = np.multiply(dim,color)
+    fig,ax = plot_pcs(X_sel,0,1,lab2_sel,color)
+    fig,ax = plot_pcs(X_sel,2,3,lab2_sel,color)
+    fig,ax = plot_pcs(X_sel,4,5,lab2_sel,color)
+    fig,ax = plot_pcs(X_sel,6,7,lab2_sel,color)
+    fig,ax = plot_pcs(X_sel,8,9,lab2_sel,color)
+    fig,ax = plot_pcs(X_sel,2,4,lab2_sel,color)
+
 
 
 # Larval and life stage distributions -----------------------------------------

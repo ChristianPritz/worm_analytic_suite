@@ -1887,6 +1887,12 @@ def save_json_atomically(data, output_path):
     # Replace the final file atomically
     shutil.move(temp_name, output_path)
 
+
+
+
+
+
+
 def apply_filtering(coco_json, settings):
     """
     Filters annotations based on rim_score.
@@ -1958,7 +1964,54 @@ def apply_filtering(coco_json, settings):
     
 
 
+
+def mask_outside_ci(arr, ci=0.95):
+    """
+    Replace values outside the column-wise confidence interval with np.nan.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        2D numpy array (n x m)
+    ci : float, optional
+        Confidence interval (default 0.95 for 95%)
+
+    Returns
+    -------
+    masked : np.ndarray
+        Copy of input array where values outside CI are np.nan
+    """
+    if arr.ndim != 2:
+        raise ValueError("Input must be a 2D numpy array")
+
+    masked = arr.copy().astype(float)
+
+    # z-score for the requested confidence interval
+    z = scipy.stats.norm.ppf(1 - (1 - ci) / 2)
+
+    for col in range(masked.shape[1]):
+        col_data = masked[:, col]
+        valid = ~np.isnan(col_data)
+
+        if np.sum(valid) < 2:
+            continue  # not enough data to compute CI
+
+        mean = np.nanmean(col_data)
+        sem = scipy.stats.sem(col_data[valid], nan_policy='omit')
+
+        lower = mean - z * sem
+        upper = mean + z * sem
+
+        outside = (col_data < lower) | (col_data > upper)
+        masked[outside, col] = np.nan
+
+    return masked
+
+
 # ---------------------------- class_clean_up (unchanged) ---------------------
+
+
+
 
 def class_clean_up(data, color_csv):
     """
