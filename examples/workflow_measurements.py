@@ -15,6 +15,7 @@ from worm_plotter import worm_width_plot, df_to_grouped_array,plot_grouped_value
 from classifiers import  classify,run_kmeans_and_show,label_coco_areas,coco_areas_calculation,train_classifier
 from annotation_tool_v8 import AnnotationTool
 from worm_plotter import *
+from worm_statistics import * 
 
 ##---------------------------------------------------------------------------##
 #
@@ -121,7 +122,9 @@ color_csv = '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
 output_dir= '/media/my_device/space worms/worm_profiler_sw/images/output/'
 plot_path = '/media/my_device/space worms/worm_profiler_sw/images/plots'
 save_path = '/media/my_device/space worms/worm_profiler_sw/output/df.csv'
+metirc_stats_path = '/media/my_device/space worms/worm_profiler_sw/output/metric_stats.csv'
 p0_path = '/media/my_device/space worms/worm_profiler_parental/output/p0_metrics.json'
+
 
 os.makedirs(plot_path,exist_ok=True)
 
@@ -191,7 +194,7 @@ df = create_group_labels(df)
 #-----------------------------------------------------------------------------#
 # Applying pixel size to calibrate the measurements
 #-----------------------------------------------------------------------------#
-print(df.is_real_world_units)
+
 if "is_real_world_units" not in df.columns:
     df_backup = copy.deepcopy(df)
     for i in cols :
@@ -216,6 +219,12 @@ cols = ['percent_0.05', 'percent_0.1', 'percent_0.15', 'percent_0.2',
        'percent_0.85', 'percent_0.9', 'percent_0.95',]
 
 percents = np.arange(0.05,1,0.05)
+
+
+
+
+
+
 
 
 ##---------------------------------------------------------------------------##
@@ -364,6 +373,14 @@ colors = np.array([[0.15,0.45,0.95],[0.15,0.45,0.95],[0.15,0.45,0.95]])
 axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 
 
+#-----------------------------------------------------------------------------#
+#
+#  STATISTICS DATAFRAME, setting up statistics
+#
+#-----------------------------------------------------------------------------#
+stat_headers= ["metric","comparison","group1","group2","mean1","mean2","n1","n2","sd1","sd2","test-type","p-value","q-value"]
+design_mat = [[0,1],[1,2],[0,2]]
+stats = pd.DataFrame(columns=stat_headers)
 
 
 
@@ -394,6 +411,9 @@ for mDx,i in enumerate(metrics):
     df_adult = df[df["label_id"]==4]
     #df_adult = df[df["label_id"]=4]
     data,grps  = df_to_grouped_array(df_adult,"group_identifier",i)
+    if use_CI:
+        data = mask_outside_ci(data, ci=CI)
+    stats = run_pairwise_stats(data, design_mat, conds, "ttest",i, stats,"overall_comparison")
     axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
     if add_p0:
         m = comparison_values[i]
@@ -413,8 +433,13 @@ for mDx,i in enumerate(metrics):
     for idx in range(1,4):
         df_cond = df_adult[df_adult["generation"]==idx]
         data,grps  = df_to_grouped_array(df_cond,"group_identifier",i)
+        
+        
         if use_CI:
             data = mask_outside_ci(data, ci=CI)
+        comp_name = "comparison_between_groups_for_generation " + str(idx)
+        stats = run_pairwise_stats(data, design_mat, conds, "ttest",i, stats,comp_name)
+        
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
         if add_p0:
             m = comparison_values[i]
@@ -434,8 +459,12 @@ for mDx,i in enumerate(metrics):
     for idx in range(1,4):
         df_cond = df_adult[df_adult["trial"]==idx]
         data,grps  = df_to_grouped_array(df_cond,"group_identifier",i)
+        
+        
         if use_CI:
             data = mask_outside_ci(data, ci=CI)
+        comp_name = "comparison_between_groups_for_trial " + str(idx)
+        stats = run_pairwise_stats(data, design_mat, conds, "ttest",i, stats,comp_name)
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
         if add_p0:
             m = comparison_values[i]
@@ -460,8 +489,12 @@ for mDx,i in enumerate(metrics):
         selector = cont[1]
         df_cond = df_adult[df_adult[selector]==1]
         data,grps  = df_to_grouped_array(df_cond,"generation",i)
+        
         if use_CI:
             data = mask_outside_ci(data, ci=CI)
+            
+        comp_name = "over_generations_single_condition " + label
+        stats = run_pairwise_stats(data, design_mat, ["gen 1","gen 2","gen 3"], "ttest",i, stats,comp_name)
         colors = np.tile(group_colors[idx,:],(3,1))
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,plot_props=prop)
         if add_p0:
@@ -486,12 +519,15 @@ for mDx,i in enumerate(metrics):
         data,grps  = df_to_grouped_array(df_cond,"trial",i)
         if use_CI:
             data = mask_outside_ci(data, ci=CI)
+            
+        comp_name = "over_trials_single_condition " + label
+        stats = run_pairwise_stats(data, design_mat, ["gen 1","gen 2","gen 3"], "ttest",i, stats,comp_name)
         colors = np.tile(group_colors[idx,:],(3,1))
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,plot_props=prop)
         if add_p0:
             m = comparison_values[i]
             axObj = add_mean_std_lines(axObj, m[0], m[1])
-        name = i + "_" + label + "_over_generations_single_condition" 
+        name = i + "_" + label + "_over_trials_single_condition" 
         print(name)
         save_plot(axObj[0],name,plot_path)
         if i == "intensity":
@@ -502,6 +538,9 @@ for mDx,i in enumerate(metrics):
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
 
+
+stats = apply_bh_fdr(stats)
+stats.to_csv(metirc_stats_path)
 
 #RUN A PCA over all the data
 
