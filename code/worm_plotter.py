@@ -629,9 +629,6 @@ def plot_pcs(scores: np.ndarray,
 
     # nicer ticks
     ax.tick_params(width=1.2, length=5)
-
-    for spine in ax.spines.values():
-        spine.set_linewidth(1.2)
     
     for spine in ax.spines.values():
         spine.set_linewidth(2.5)
@@ -701,11 +698,13 @@ def run_pca(df: pd.DataFrame, columns: list):
 # plot handling functions     
 #
 ###############################################################################    
-def add_mean_std_lines(fig, axes, mean, std,save=None):
+def add_mean_std_lines(figObj, mean, std,save=None):
     """
     Adds three horizontal lines to an existing matplotlib figure
     and shows the figure.
     """
+    fig = figObj[0]
+    axes = figObj[1]
 
     # Make this figure the active one
     plt.figure(fig.number)
@@ -736,6 +735,8 @@ def add_mean_std_lines(fig, axes, mean, std,save=None):
         display(fig)
     else: 
         save_plot(fig,save[0],save[1])
+    return [fig,axes]
+
         
     
 

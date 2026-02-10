@@ -3135,17 +3135,16 @@ def create_group_labels_controls(df,grps=None,arr=None):
 
 def check_cond(istr):
     marker = [0,0,0,0,0,0]
+    if '_P0' in istr:
+        marker[0] = 1
     if '_NG' in istr:
         marker[1] = 1
     if '_LH'  in istr:
         marker[2] = 1
     if '_0G'  in istr:
         marker[3] = 1
-    
-    
     if '_G' in istr:
-        marker[4] = int(istr[6])
-        
+        marker[4] = int(istr[6])     
     if '_T' in istr:
         marker[5] = int(istr[9])
         

@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from shapely.geometry import LineString, Point, Polygon
 import pandas as pd
-import cv2,copy
+import cv2,copy,json
 from measurements import *
 from worm_plotter import worm_width_plot, df_to_grouped_array,plot_grouped_values,class_histogram
 from classifiers import  classify,run_kmeans_and_show,label_coco_areas,coco_areas_calculation,train_classifier
@@ -121,6 +121,7 @@ color_csv = '/home/wormulon/models/worm_analytic_suite/class_colors.csv'
 output_dir= '/media/my_device/space worms/worm_profiler_sw/images/output/'
 plot_path = '/media/my_device/space worms/worm_profiler_sw/images/plots'
 save_path = '/media/my_device/space worms/worm_profiler_sw/output/df.csv'
+p0_path = '/media/my_device/space worms/worm_profiler_parental/output/p0_metrics.json'
 
 os.makedirs(plot_path,exist_ok=True)
 
@@ -190,11 +191,14 @@ df = create_group_labels(df)
 #-----------------------------------------------------------------------------#
 # Applying pixel size to calibrate the measurements
 #-----------------------------------------------------------------------------#
-df_backup = copy.deepcopy(df)
-for i in cols :
-    df[i] = df[i]/settings["pixel_size"] 
-df["length"] = df["length"]/settings["pixel_size"]
-df["area"] = df["area"]/settings["pixel_size"]**2
+print(df.is_real_world_units)
+if "is_real_world_units" not in df.columns:
+    df_backup = copy.deepcopy(df)
+    for i in cols :
+        df[i] = df[i]/settings["pixel_size"] 
+    df["length"] = df["length"]/settings["pixel_size"]
+    df["area"] = df["area"]/settings["pixel_size"]**2
+    df["is_real_world_units"] = True
 
 
 #-----------------------------------------------------------------------------#
@@ -366,7 +370,8 @@ axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors)
 # metric plots ----------------------------------------------------------------
 #
 #------------------------------------------------------------------------------
-
+with open(p0_path, "r") as f:
+    comparison_values = json.load(f)
 
 #df_adult = df[df["label_id"]==4]
 s=df.loc[:,['percent_0.5','percent_0.55','percent_0.6', 'percent_0.65','percent_0.7','percent_0.75']]
@@ -380,8 +385,9 @@ props = [{"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Area (µm2)'}, #area
          {"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Length (µm)'}, #length
          {"xlim":"AUTO","ylim":"AUTO","xlabel":'',"ylabel":'Intensity (a.u.)'}, #intensity
          {"ylim":[0,160],"xlim":"AUTO","xlabel":'',"ylabel":'Width (µm)'},]#width_average
-use_CI = True
+use_CI = False
 CI = 0.90
+add_p0 = True
 
 for mDx,i in enumerate(metrics): 
     prop = props[mDx]
@@ -389,10 +395,16 @@ for mDx,i in enumerate(metrics):
     #df_adult = df[df["label_id"]=4]
     data,grps  = df_to_grouped_array(df_adult,"group_identifier",i)
     axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
+    if add_p0:
+        m = comparison_values[i]
+        axObj = add_mean_std_lines(axObj, m[0], m[1])
     name = i + "_overall_comparison"
     save_plot(axObj[0],name,plot_path)
     if i == "intensity":
         axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True,plot_props=prop)
+        if add_p0:
+            m = comparison_values[i]
+            axObj = add_mean_std_lines(axObj, m[0], m[1])
         name = i + "_overall_comparison_logY"
         save_plot(axObj[0],name,plot_path)
     
@@ -404,11 +416,17 @@ for mDx,i in enumerate(metrics):
         if use_CI:
             data = mask_outside_ci(data, ci=CI)
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
+        if add_p0:
+            m = comparison_values[i]
+            axObj = add_mean_std_lines(axObj, m[0], m[1])
         name = i + "_comparison_between_groups_for_generation_" + str(idx) 
         print(name)
         save_plot(axObj[0],name,plot_path)
         if i == "intensity":
             axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True,plot_props=prop)
+            if add_p0:
+                m = comparison_values[i]
+                axObj = add_mean_std_lines(axObj, m[0], m[1])
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
         
@@ -419,11 +437,17 @@ for mDx,i in enumerate(metrics):
         if use_CI:
             data = mask_outside_ci(data, ci=CI)
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=group_colors,plot_props=prop)
+        if add_p0:
+            m = comparison_values[i]
+            axObj = add_mean_std_lines(axObj, m[0], m[1])
         name = i + "_comparison_between_groups_for_trial_" + str(idx) 
         print(name)
         save_plot(axObj[0],name,plot_path)
         if i == "intensity":
             axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=group_colors,logY=True,plot_props=prop)
+            if add_p0:
+                m = comparison_values[i]
+                axObj = add_mean_std_lines(axObj, m[0], m[1])
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
     
@@ -440,11 +464,17 @@ for mDx,i in enumerate(metrics):
             data = mask_outside_ci(data, ci=CI)
         colors = np.tile(group_colors[idx,:],(3,1))
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,plot_props=prop)
+        if add_p0:
+            m = comparison_values[i]
+            axObj = add_mean_std_lines(axObj, m[0], m[1])
         name = i + "_" + label + "_over_generations_single_condition" 
         print(name)
         save_plot(axObj[0],name,plot_path)
         if i == "intensity":
             axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True,plot_props=prop)
+            if add_p0:
+                m = comparison_values[i]
+                axObj = add_mean_std_lines(axObj, m[0], m[1])
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
      
@@ -458,11 +488,17 @@ for mDx,i in enumerate(metrics):
             data = mask_outside_ci(data, ci=CI)
         colors = np.tile(group_colors[idx,:],(3,1))
         axObj = plot_grouped_values(data,grps,figsize=[3.5,6],colors=colors,plot_props=prop)
+        if add_p0:
+            m = comparison_values[i]
+            axObj = add_mean_std_lines(axObj, m[0], m[1])
         name = i + "_" + label + "_over_generations_single_condition" 
         print(name)
         save_plot(axObj[0],name,plot_path)
         if i == "intensity":
             axObj = plot_grouped_values(data, grps,figsize=[3.5,6],colors=colors,logY=True,plot_props=prop)
+            if add_p0:
+                m = comparison_values[i]
+                axObj = add_mean_std_lines(axObj, m[0], m[1])
             name = name + "_logY"
             save_plot(axObj[0],name,plot_path)
 
@@ -492,6 +528,9 @@ fig,ax = plot_pcs(X,2,3,labels.drop(killed),group_colors)
 fig,ax = plot_pcs(X,4,5,labels.drop(killed),group_colors)
 fig,ax = plot_pcs(X,6,7,labels.drop(killed),group_colors)
 fig,ax = plot_pcs(X,8,9,labels.drop(killed),group_colors)
+fig,ax = plot_pcs(X,1,3,labels.drop(killed),group_colors)
+fig,ax = plot_pcs(X,0,3,labels.drop(killed),group_colors)
+
 
 dim = np.array([[1,1,1],[0.6,0.6,0.6],[0.3,0.3,0.3]])
 # plots per generation per cond. 
@@ -511,7 +550,7 @@ for idx,i in enumerate(conds):
     fig,ax = plot_pcs(X_sel,6,7,lab2_sel,color)
     fig,ax = plot_pcs(X_sel,8,9,lab2_sel,color)
     fig,ax = plot_pcs(X_sel,2,4,lab2_sel,color)
-
+    fig,ax = plot_pcs(X_sel,0,3,lab2_sel,color)
 
 
 # Larval and life stage distributions -----------------------------------------
