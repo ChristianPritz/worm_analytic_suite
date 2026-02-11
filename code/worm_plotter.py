@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from IPython import embed
 from IPython.display import display
 from matplotlib.patches import Rectangle
+import copy
 
 # def df_to_grouped_array(df: pd.DataFrame, sort_col: str, value_col: str):
 #     # Group by sort_col and extract lists of value_col
@@ -504,8 +505,9 @@ def class_histogram(
     else:
         u_class, cts = np.unique(data, return_counts=True)
         x = np.arange(len(u_class))
-
+    raw_cts = copy.copy(cts)
     if normalize:
+        
         cts = cts/np.sum(cts)*100
     # Plot
     
@@ -578,8 +580,20 @@ def class_histogram(
 
     plt.tight_layout()
     plt.show()
+
+    raw_cts = np.hstack((np.nan, raw_cts, np.sum(raw_cts)))
     
-    return (fig,ax) 
+    # reset labels and prepend "group", then append "sum"
+    labels = labels.reset_index(drop=True)
+    labels = pd.concat([pd.Series(["group"]), labels, pd.Series(["sum"])],
+                       ignore_index=True)
+    
+    # build dataframe
+    df = pd.DataFrame(
+        data=raw_cts.reshape((1, raw_cts.size)),
+        columns=labels.to_list()
+    )
+    return (fig,ax),df
 
 import pandas as pd
 from sklearn.decomposition import PCA

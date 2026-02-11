@@ -70,51 +70,48 @@ def run_pairwise_stats(data_mat, design_mat, group_names, test_type,
                              ignore_index=True)
 
     return stats_df
-
 def apply_bh_fdr(stats_df, p_col="p-value", q_col="q-value", sig_col="significance"):
     """
-    Apply Benjamini-Hochberg FDR correction to the dataframe and add significance stars.
-    
-    Parameters
-    ----------
-    stats_df : pd.DataFrame
-        DataFrame containing at least a p-value column.
-    p_col : str
-        Name of the p-value column (default: "p-value").
-    q_col : str
-        Name of the q-value column to be filled (default: "q-value").
-    sig_col : str
-        Name of the column to indicate significance with stars (default: "significance").
-        
-    Returns
-    -------
-    stats_df : pd.DataFrame
-        Updated DataFrame with q-values and significance stars.
+    Apply Benjamini-Hochberg FDR correction to the dataframe
+    while safely ignoring NaN p-values.
     """
 
-    pvals = stats_df[p_col].values
-    n = len(pvals)
+    pvals = stats_df[p_col].to_numpy(dtype=float)
 
-    # sort p-values
-    order = np.argsort(pvals)
-    ranked_pvals = pvals[order]
+    # --- Step 1: identify valid p-values
+    valid_mask = ~np.isnan(pvals)
+    valid_pvals = pvals[valid_mask]
 
-    # BH formula
+    # If nothing to correct, just fill columns and exit
+    if valid_pvals.size == 0:
+        stats_df[q_col] = np.nan
+        stats_df[sig_col] = "ns"
+        return stats_df
+
+    # --- Step 2: do BH ONLY on valid p-values
+    n = valid_pvals.size
+    order = np.argsort(valid_pvals)
+    ranked_pvals = valid_pvals[order]
+
     qvals = ranked_pvals * n / (np.arange(1, n + 1))
-
-    # enforce monotonicity
     qvals = np.minimum.accumulate(qvals[::-1])[::-1]
     qvals[qvals > 1] = 1
 
-    # put back into original order
-    qvals_correct_order = np.empty_like(qvals)
-    qvals_correct_order[order] = qvals
+    # restore original order within valid set
+    qvals_correct = np.empty_like(qvals)
+    qvals_correct[order] = qvals
 
-    stats_df[q_col] = qvals_correct_order
+    # --- Step 3: place q-values back into full array
+    full_qvals = np.full_like(pvals, np.nan)
+    full_qvals[valid_mask] = qvals_correct
 
-    # add significance stars
+    stats_df[q_col] = full_qvals
+
+    # --- Step 4: add stars
     def q_to_stars(q):
-        if q < 0.001:
+        if np.isnan(q):
+            return "ns"
+        elif q < 0.001:
             return "***"
         elif q < 0.01:
             return "**"
@@ -126,7 +123,6 @@ def apply_bh_fdr(stats_df, p_col="p-value", q_col="q-value", sig_col="significan
     stats_df[sig_col] = stats_df[q_col].apply(q_to_stars)
 
     return stats_df
-
 
 def two_samp_proportionality(mat):
     """
@@ -168,3 +164,65 @@ def two_samp_proportionality(mat):
     p = 2 * (1 - norm.cdf(abs(z)))
 
     return z, p
+
+def proportionality_stats_from_df(df, design_mat, stats_df,
+                                  comparison_name="overall"):
+    """
+    Perform pairwise proportionality tests for each larval stage
+    between groups defined in design_mat.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe as described.
+    design_mat : list of [i, j]
+        Indices of groups to compare (row indices of df).
+    stats_df : pd.DataFrame
+        Empty or existing dataframe to append results to.
+    comparison_name : str
+        Label for the 'comparison' column (default: "overall")
+
+    Returns
+    -------
+    stats_df : pd.DataFrame
+        Updated dataframe with appended results.
+    """
+
+    # All stage columns (exclude 'group' and 'sum')
+    stage_cols = [c for c in df.columns if c not in ["group", "sum"]]
+
+    for stage in stage_cols:
+        for comp in design_mat:
+            i, j = comp
+
+            group1 = df.loc[i, "group"]
+            group2 = df.loc[j, "group"]
+
+            x1 = df.loc[i, stage]
+            n1 = df.loc[i, "sum"]
+
+            x2 = df.loc[j, stage]
+            n2 = df.loc[j, "sum"]
+
+            mat = np.array([[x1, x2],
+                            [n1, n2]])
+
+            z, p = two_samp_proportionality(mat)
+
+            new_row = {
+                "Stage": stage,
+                "comparison": comparison_name,
+                "group1": group1,
+                "group2": group2,
+                "x1": x1,
+                "x2": x2,
+                "n1": n1,
+                "n2": n2,
+                "p-value": p,
+                "q-value": np.nan
+            }
+
+            stats_df = pd.concat([stats_df, pd.DataFrame([new_row])],
+                                 ignore_index=True)
+
+    return stats_df

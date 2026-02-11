@@ -123,6 +123,7 @@ output_dir= '/media/my_device/space worms/worm_profiler_sw/images/output/'
 plot_path = '/media/my_device/space worms/worm_profiler_sw/images/plots'
 save_path = '/media/my_device/space worms/worm_profiler_sw/output/df.csv'
 metirc_stats_path = '/media/my_device/space worms/worm_profiler_sw/output/metric_stats.csv'
+larval_stats_path = '/media/my_device/space worms/worm_profiler_sw/output/larval_metric_stats.csv'
 p0_path = '/media/my_device/space worms/worm_profiler_parental/output/p0_metrics.json'
 
 
@@ -596,6 +597,11 @@ for idx,i in enumerate(conds):
 #
 #------------------------------------------------------------------------------
 
+stat_headers= ["Stage","comparison","group1","group2","x1","x2","n1","n2","p-value","q-value"]
+design_mat = [[0,1],[1,2],[0,2]]
+stats = pd.DataFrame(columns=stat_headers)
+larval_stats = pd.DataFrame(columns=stat_headers)
+
 #loading the class labels
 clss = pd.read_csv(color_csv,header=None)
 cond_labels = ["is_0G","is_LH","is_NG"]
@@ -606,7 +612,8 @@ display_classes =       clss.iloc[3:13,:]
 disp_clss = display_classes
 disp_clss = disp_clss.drop(6)
 
-
+if 'summary_table' in locals():
+    del summary_table
 
 for idx, container in enumerate(zip(conds,cond_labels)):
     label = container[0]
@@ -614,10 +621,16 @@ for idx, container in enumerate(zip(conds,cond_labels)):
     #overall
     df_cond = df[df[selector]==1]
     data = df_cond["label_id"]
-    axObj = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True,ax_labels=disp_clss)
+    axObj,df_stats = class_histogram(data,clss,show_counts=True,color = group_colors[idx,:],normalize=True,ax_labels=disp_clss)
+    df_stats["group"].iloc[0] = label
+    if 'summary_table' in locals():
+        summary_table = pd.concat([summary_table, df_stats], axis=0, ignore_index=True)
+    else:
+        summary_table = df_stats
     name = "life_stage_histogram_" + label + "overall"
     save_plot(axObj[0],name,plot_path)
-
+    
+    
 
     #Across generations
     for i in range(1,4):
@@ -637,8 +650,9 @@ for idx, container in enumerate(zip(conds,cond_labels)):
 
 
 
-
-
+larval_stats = proportionality_stats_from_df(summary_table, design_mat, larval_stats, comparison_name="overall")
+larval_stats = apply_bh_fdr(larval_stats)
+larval_stats.to_csv(larval_stats_path)
 
 
 
