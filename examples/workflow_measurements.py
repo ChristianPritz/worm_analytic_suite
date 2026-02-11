@@ -657,6 +657,16 @@ larval_stats.to_csv(larval_stats_path)
 
 
 
+# How to overlay the histograms: 
+    
+l_path = "/media/my_device/space worms/makesenseai_analyzed_images/to analyze/images/output/plots/"
+
+name1 = "life_stage_histogram_NGoverall"
+name2 = "life_stage_histogram_0Goverall"
+
+merge_pickled_barplots_over_ax1(name1, name2, l_path)
+
+
 
 
 
