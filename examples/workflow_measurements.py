@@ -26,7 +26,7 @@ from worm_statistics import *
 
 # global settings
 settings = {"rim_score_cutoff":0.05, #cut-off for worms on the image edge
-            "debug":False,           #displaying the control plots 
+            "debug":True,           #displaying the control plots 
             "use_classifier":False,  #use classifier to eliminate the worm fragments
             "pixel_size":1.4571,        #global pixel size value
             "imsize":3120,
